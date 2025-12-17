@@ -17,7 +17,7 @@ These scripts provide command-line interfaces to common Seurat workflows, allowi
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR_USERNAME/seurat-cli.git
+git clone https://github.com/bminie/seurat-cli.git
 cd seurat-cli
 
 # Install dependencies
