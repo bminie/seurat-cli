@@ -1,0 +1,43 @@
+# =============================================================================
+# Demo Configuration - Uses built-in PBMC3K dataset
+# =============================================================================
+#
+# This config runs a demo analysis using --demo flag
+#
+# Usage:
+#   snakemake --configfile config_demo.yaml --cores 4
+#
+# =============================================================================
+
+workflow: "sctransform"
+scripts_dir: "../../scripts"
+output_dir: "demo_results"
+
+# Demo mode - uses built-in dataset
+input_path: "DEMO"
+
+species: "human"
+threads: 4
+
+sctransform:
+  n_variable_features: 3000
+  resolution: 0.5
+  dims_use: "1:30"
+  extra_args: "--demo"
+
+de:
+  mode: "all_markers"
+  test_use: "wilcox"
+  logfc_threshold: 0.25
+  min_pct: 0.1
+  extra_args: "--demo"
+
+cell_cycle:
+  regress: false
+  regress_difference: false
+  extra_args: "--demo"
+
+visualization:
+  reduction: "umap"
+  features: ""
+  extra_args: "--demo"

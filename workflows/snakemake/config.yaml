@@ -1,0 +1,103 @@
+# =============================================================================
+# Seurat CLI Snakemake Pipeline Configuration
+# =============================================================================
+#
+# Copy this file and modify for your analysis.
+#
+# Usage:
+#   snakemake --configfile my_config.yaml --cores 4
+#
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Workflow Selection
+# -----------------------------------------------------------------------------
+# Options: basic, sctransform, integration, cell_cycle, full
+#
+# Workflow paths:
+#   basic:       01_basic_analysis → 04_de → 06_visualization
+#   sctransform: 02_sctransform → 04_de → 06_visualization
+#   integration: 03_integration → 04_de → 06_visualization
+#   cell_cycle:  02_sctransform → 05_cell_cycle → 04_de → 06_visualization
+#   full:        02_sctransform → 05_cell_cycle → 04_de → 06_visualization
+
+workflow: "sctransform"
+
+# -----------------------------------------------------------------------------
+# Paths
+# -----------------------------------------------------------------------------
+
+# Path to seurat-cli scripts directory (relative to Snakefile or absolute)
+scripts_dir: "../../scripts"
+
+# Output directory for all results
+output_dir: "results"
+
+# -----------------------------------------------------------------------------
+# Input Data
+# -----------------------------------------------------------------------------
+
+# For basic/sctransform/cell_cycle workflows - single input
+# Can be: 10x directory, .h5 file, .rds file, or .csv
+input_path: "/path/to/your/data"
+
+# For integration workflow - file containing paths (one per line) or comma-separated
+input_list: "/path/to/sample_list.txt"
+
+# -----------------------------------------------------------------------------
+# Common Parameters
+# -----------------------------------------------------------------------------
+
+species: "human"  # human or mouse
+threads: 4
+
+# -----------------------------------------------------------------------------
+# Script-Specific Parameters
+# -----------------------------------------------------------------------------
+
+# Basic Analysis (01_basic_analysis.R)
+basic:
+  min_features: 200
+  max_features: 2500
+  max_mt: 5
+  resolution: 0.5
+  dims_use: "1:10"
+  extra_args: ""  # Additional arguments to pass
+
+# SCTransform (02_sctransform.R)
+sctransform:
+  n_variable_features: 3000
+  resolution: 0.5
+  dims_use: "1:30"
+  vars_to_regress: ""  # e.g., "percent.mt" or "percent.mt,nCount_RNA"
+  extra_args: ""
+
+# Integration (03_integration.R)
+integration:
+  method: "CCAIntegration"  # CCAIntegration, RPCAIntegration, HarmonyIntegration, FastMNNIntegration
+  normalization: "LogNormalize"  # LogNormalize or SCT
+  resolution: 0.5
+  dims_use: "1:30"
+  sample_names: ""  # Comma-separated, e.g., "Sample1,Sample2,Sample3"
+  conditions: ""    # Comma-separated, e.g., "control,treatment,treatment"
+  extra_args: ""
+
+# Differential Expression (04_differential_expression.R)
+de:
+  mode: "all_markers"  # all_markers, between_clusters, between_conditions
+  test_use: "wilcox"   # wilcox, t, MAST, DESeq2, negbinom
+  logfc_threshold: 0.25
+  min_pct: 0.1
+  extra_args: ""
+
+# Cell Cycle (05_cell_cycle.R)
+cell_cycle:
+  regress: false           # Regress out S.Score and G2M.Score
+  regress_difference: false # Regress out CC.Difference only (preserves cycling vs non-cycling)
+  extra_args: ""
+
+# Visualization (06_visualization.R)
+visualization:
+  reduction: "umap"
+  features: ""  # Comma-separated gene names, e.g., "CD3D,CD4,CD8A,MS4A1"
+  extra_args: ""

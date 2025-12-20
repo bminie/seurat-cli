@@ -1,0 +1,343 @@
+# =============================================================================
+# Seurat CLI Snakemake Pipeline
+# =============================================================================
+#
+# Flexible pipeline for running Seurat CLI scripts in sequence.
+#
+# Usage:
+#   snakemake --configfile config.yaml --cores 4
+#   snakemake --configfile config.yaml --cores 4 -n  # Dry run
+#   snakemake --configfile config.yaml --cores 4 --until differential_expression
+#
+# =============================================================================
+
+import os
+from pathlib import Path
+
+# -----------------------------------------------------------------------------
+# Configuration
+# -----------------------------------------------------------------------------
+
+# Set defaults
+configfile: "config.yaml"
+
+# Workflow type: basic, sctransform, integration, cell_cycle, full
+WORKFLOW = config.get("workflow", "basic")
+
+# Directories
+SCRIPTS_DIR = config.get("scripts_dir", "../../scripts")
+OUTPUT_DIR = config.get("output_dir", "results")
+
+# Input files
+INPUT_PATH = config.get("input_path", None)
+INPUT_LIST = config.get("input_list", None)  # For integration
+
+# Common parameters
+SPECIES = config.get("species", "human")
+THREADS = config.get("threads", 1)
+
+# -----------------------------------------------------------------------------
+# Helper Functions
+# -----------------------------------------------------------------------------
+
+def get_script_path(script_name):
+    """Get full path to a script."""
+    return os.path.join(SCRIPTS_DIR, script_name)
+
+def get_entry_output():
+    """Get the output RDS from the entry point script based on workflow."""
+    if WORKFLOW == "integration":
+        return os.path.join(OUTPUT_DIR, "01_integration", "seurat_integrated.rds")
+    elif WORKFLOW in ["sctransform", "full"]:
+        return os.path.join(OUTPUT_DIR, "01_sctransform", "seurat_sctransform.rds")
+    else:
+        return os.path.join(OUTPUT_DIR, "01_basic", "seurat_analyzed.rds")
+
+def get_final_target():
+    """Get the final target based on workflow."""
+    return os.path.join(OUTPUT_DIR, "visualization", "visualization_summary.md")
+
+# -----------------------------------------------------------------------------
+# Target Rules
+# -----------------------------------------------------------------------------
+
+rule all:
+    input:
+        get_final_target()
+
+# Allow running up to specific steps
+rule basic_analysis_only:
+    input:
+        os.path.join(OUTPUT_DIR, "01_basic", "seurat_analyzed.rds")
+
+rule sctransform_only:
+    input:
+        os.path.join(OUTPUT_DIR, "01_sctransform", "seurat_sctransform.rds")
+
+rule integration_only:
+    input:
+        os.path.join(OUTPUT_DIR, "01_integration", "seurat_integrated.rds")
+
+rule cell_cycle_only:
+    input:
+        os.path.join(OUTPUT_DIR, "02_cell_cycle", "seurat_cell_cycle.rds")
+
+rule differential_expression_only:
+    input:
+        os.path.join(OUTPUT_DIR, "03_differential_expression", "de_results_all.csv")
+
+# -----------------------------------------------------------------------------
+# Entry Point Rules (Choose One)
+# -----------------------------------------------------------------------------
+
+rule basic_analysis:
+    """Run basic analysis (script 01) - entry point for 'basic' workflow."""
+    output:
+        rds = os.path.join(OUTPUT_DIR, "01_basic", "seurat_analyzed.rds"),
+        markers = os.path.join(OUTPUT_DIR, "01_basic", "cluster_markers_all.csv")
+    params:
+        script = get_script_path("01_basic_analysis.R"),
+        input_path = INPUT_PATH,
+        output_dir = os.path.join(OUTPUT_DIR, "01_basic"),
+        min_features = config.get("basic", {}).get("min_features", 200),
+        max_features = config.get("basic", {}).get("max_features", 2500),
+        max_mt = config.get("basic", {}).get("max_mt", 5),
+        resolution = config.get("basic", {}).get("resolution", 0.5),
+        dims = config.get("basic", {}).get("dims_use", "1:10"),
+        extra = config.get("basic", {}).get("extra_args", "")
+    threads: THREADS
+    log:
+        os.path.join(OUTPUT_DIR, "logs", "basic_analysis.log")
+    shell:
+        """
+        Rscript {params.script} \
+            --input {params.input_path} \
+            --output {params.output_dir} \
+            --species {SPECIES} \
+            --min_features {params.min_features} \
+            --max_features {params.max_features} \
+            --max_mt {params.max_mt} \
+            --resolution {params.resolution} \
+            --dims_use "{params.dims}" \
+            --threads {threads} \
+            {params.extra} \
+            2>&1 | tee {log}
+        """
+
+rule sctransform:
+    """Run SCTransform analysis (script 02) - entry point for 'sctransform'/'full' workflow."""
+    output:
+        rds = os.path.join(OUTPUT_DIR, "01_sctransform", "seurat_sctransform.rds"),
+        markers = os.path.join(OUTPUT_DIR, "01_sctransform", "cluster_markers_all.csv")
+    params:
+        script = get_script_path("02_sctransform.R"),
+        input_path = INPUT_PATH,
+        output_dir = os.path.join(OUTPUT_DIR, "01_sctransform"),
+        n_features = config.get("sctransform", {}).get("n_variable_features", 3000),
+        resolution = config.get("sctransform", {}).get("resolution", 0.5),
+        dims = config.get("sctransform", {}).get("dims_use", "1:30"),
+        vars_to_regress = config.get("sctransform", {}).get("vars_to_regress", ""),
+        extra = config.get("sctransform", {}).get("extra_args", "")
+    threads: THREADS
+    log:
+        os.path.join(OUTPUT_DIR, "logs", "sctransform.log")
+    run:
+        vars_regress_arg = f'--vars_to_regress "{params.vars_to_regress}"' if params.vars_to_regress else ""
+        shell(f"""
+        Rscript {params.script} \
+            --input {params.input_path} \
+            --output {params.output_dir} \
+            --species {SPECIES} \
+            --n_variable_features {params.n_features} \
+            --resolution {params.resolution} \
+            --dims_use "{params.dims}" \
+            --threads {threads} \
+            {vars_regress_arg} \
+            {params.extra} \
+            2>&1 | tee {log}
+        """)
+
+rule integration:
+    """Run integration analysis (script 03) - entry point for 'integration' workflow."""
+    output:
+        rds = os.path.join(OUTPUT_DIR, "01_integration", "seurat_integrated.rds"),
+        markers = os.path.join(OUTPUT_DIR, "01_integration", "cluster_markers_all.csv")
+    params:
+        script = get_script_path("03_integration.R"),
+        input_list = INPUT_LIST,
+        output_dir = os.path.join(OUTPUT_DIR, "01_integration"),
+        method = config.get("integration", {}).get("method", "CCAIntegration"),
+        normalization = config.get("integration", {}).get("normalization", "LogNormalize"),
+        resolution = config.get("integration", {}).get("resolution", 0.5),
+        dims = config.get("integration", {}).get("dims_use", "1:30"),
+        sample_names = config.get("integration", {}).get("sample_names", ""),
+        conditions = config.get("integration", {}).get("conditions", ""),
+        extra = config.get("integration", {}).get("extra_args", "")
+    threads: THREADS
+    log:
+        os.path.join(OUTPUT_DIR, "logs", "integration.log")
+    run:
+        sample_arg = f'--sample_names "{params.sample_names}"' if params.sample_names else ""
+        cond_arg = f'--conditions "{params.conditions}"' if params.conditions else ""
+        shell(f"""
+        Rscript {params.script} \
+            --input_list {params.input_list} \
+            --output {params.output_dir} \
+            --species {SPECIES} \
+            --method {params.method} \
+            --normalization {params.normalization} \
+            --resolution {params.resolution} \
+            --dims_use "{params.dims}" \
+            --threads {threads} \
+            {sample_arg} \
+            {cond_arg} \
+            {params.extra} \
+            2>&1 | tee {log}
+        """)
+
+# -----------------------------------------------------------------------------
+# Cell Cycle Rule
+# -----------------------------------------------------------------------------
+
+def get_cell_cycle_input(wildcards):
+    """Get input for cell cycle based on workflow."""
+    if WORKFLOW == "integration":
+        return os.path.join(OUTPUT_DIR, "01_integration", "seurat_integrated.rds")
+    elif WORKFLOW in ["sctransform", "full", "cell_cycle"]:
+        return os.path.join(OUTPUT_DIR, "01_sctransform", "seurat_sctransform.rds")
+    else:
+        return os.path.join(OUTPUT_DIR, "01_basic", "seurat_analyzed.rds")
+
+rule cell_cycle:
+    """Run cell cycle scoring (script 05)."""
+    input:
+        rds = get_cell_cycle_input
+    output:
+        rds = os.path.join(OUTPUT_DIR, "02_cell_cycle", "seurat_cell_cycle.rds"),
+        scores = os.path.join(OUTPUT_DIR, "02_cell_cycle", "cell_cycle_scores.csv")
+    params:
+        script = get_script_path("05_cell_cycle.R"),
+        output_dir = os.path.join(OUTPUT_DIR, "02_cell_cycle"),
+        regress = "--regress_cc" if config.get("cell_cycle", {}).get("regress", False) else "",
+        regress_diff = "--regress_cc_difference" if config.get("cell_cycle", {}).get("regress_difference", False) else "",
+        extra = config.get("cell_cycle", {}).get("extra_args", "")
+    log:
+        os.path.join(OUTPUT_DIR, "logs", "cell_cycle.log")
+    shell:
+        """
+        Rscript {params.script} \
+            --input {input.rds} \
+            --output {params.output_dir} \
+            --species {SPECIES} \
+            {params.regress} \
+            {params.regress_diff} \
+            {params.extra} \
+            2>&1 | tee {log}
+        """
+
+# -----------------------------------------------------------------------------
+# Differential Expression Rule
+# -----------------------------------------------------------------------------
+
+def get_de_input(wildcards):
+    """Get input for DE based on workflow."""
+    if WORKFLOW in ["full", "cell_cycle"]:
+        return os.path.join(OUTPUT_DIR, "02_cell_cycle", "seurat_cell_cycle.rds")
+    elif WORKFLOW == "integration":
+        return os.path.join(OUTPUT_DIR, "01_integration", "seurat_integrated.rds")
+    elif WORKFLOW == "sctransform":
+        return os.path.join(OUTPUT_DIR, "01_sctransform", "seurat_sctransform.rds")
+    else:
+        return os.path.join(OUTPUT_DIR, "01_basic", "seurat_analyzed.rds")
+
+rule differential_expression:
+    """Run differential expression analysis (script 04)."""
+    input:
+        rds = get_de_input
+    output:
+        results = os.path.join(OUTPUT_DIR, "03_differential_expression", "de_results_all.csv"),
+        sig = os.path.join(OUTPUT_DIR, "03_differential_expression", "de_results_significant.csv")
+    params:
+        script = get_script_path("04_differential_expression.R"),
+        output_dir = os.path.join(OUTPUT_DIR, "03_differential_expression"),
+        mode = config.get("de", {}).get("mode", "all_markers"),
+        test = config.get("de", {}).get("test_use", "wilcox"),
+        logfc = config.get("de", {}).get("logfc_threshold", 0.25),
+        min_pct = config.get("de", {}).get("min_pct", 0.1),
+        extra = config.get("de", {}).get("extra_args", "")
+    threads: THREADS
+    log:
+        os.path.join(OUTPUT_DIR, "logs", "differential_expression.log")
+    shell:
+        """
+        Rscript {params.script} \
+            --input {input.rds} \
+            --output {params.output_dir} \
+            --mode {params.mode} \
+            --test_use {params.test} \
+            --logfc_threshold {params.logfc} \
+            --min_pct {params.min_pct} \
+            --threads {threads} \
+            {params.extra} \
+            2>&1 | tee {log}
+        """
+
+# -----------------------------------------------------------------------------
+# Visualization Rule
+# -----------------------------------------------------------------------------
+
+def get_viz_input(wildcards):
+    """Get input for visualization based on workflow."""
+    if WORKFLOW in ["full", "cell_cycle"]:
+        return os.path.join(OUTPUT_DIR, "02_cell_cycle", "seurat_cell_cycle.rds")
+    elif WORKFLOW == "integration":
+        return os.path.join(OUTPUT_DIR, "01_integration", "seurat_integrated.rds")
+    elif WORKFLOW == "sctransform":
+        return os.path.join(OUTPUT_DIR, "01_sctransform", "seurat_sctransform.rds")
+    else:
+        return os.path.join(OUTPUT_DIR, "01_basic", "seurat_analyzed.rds")
+
+rule visualization:
+    """Run visualization (script 06)."""
+    input:
+        rds = get_viz_input,
+        de = os.path.join(OUTPUT_DIR, "03_differential_expression", "de_results_all.csv")
+    output:
+        summary = os.path.join(OUTPUT_DIR, "visualization", "visualization_summary.md")
+    params:
+        script = get_script_path("06_visualization.R"),
+        output_dir = os.path.join(OUTPUT_DIR, "visualization"),
+        marker_file = os.path.join(OUTPUT_DIR, "03_differential_expression", "de_results_significant.csv"),
+        reduction = config.get("visualization", {}).get("reduction", "umap"),
+        features = config.get("visualization", {}).get("features", ""),
+        extra = config.get("visualization", {}).get("extra_args", "")
+    log:
+        os.path.join(OUTPUT_DIR, "logs", "visualization.log")
+    run:
+        features_arg = f'--features "{params.features}"' if params.features else ""
+        shell(f"""
+        Rscript {params.script} \
+            --input {input.rds} \
+            --output {params.output_dir} \
+            --marker_file {params.marker_file} \
+            --reduction {params.reduction} \
+            {features_arg} \
+            {params.extra} \
+            2>&1 | tee {log}
+        """)
+
+# -----------------------------------------------------------------------------
+# Utility Rules
+# -----------------------------------------------------------------------------
+
+rule clean:
+    """Remove all output files."""
+    shell:
+        f"rm -rf {OUTPUT_DIR}"
+
+rule dag:
+    """Generate DAG visualization."""
+    output:
+        "dag.png"
+    shell:
+        "snakemake --dag | dot -Tpng > {output}"
