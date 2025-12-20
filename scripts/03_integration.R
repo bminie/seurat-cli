@@ -2,7 +2,7 @@
 #' =============================================================================
 #' scRNA-seq Data Integration Vignette
 #' =============================================================================
-#' 
+#'
 #' This script implements the Seurat integration vignettes for combining
 #' multiple single-cell datasets:
 #'   - Standard integration (CCA-based anchors)
@@ -19,7 +19,7 @@
 #'
 #' Usage:
 #'   Rscript 03_integration.R --input_list samples.txt --output ./integrated
-#' 
+#'
 #' =============================================================================
 
 # Source common utilities
@@ -60,17 +60,17 @@ option_list <- list(
               help = "Project name [default: %default]", metavar = "NAME"),
   make_option(c("-f", "--format"), type = "character", default = "auto",
               help = "Input format [default: %default]"),
-  
+
   # Sample info
   make_option("--sample_names", type = "character", default = NULL,
               help = "Comma-separated sample names (in same order as inputs)"),
   make_option("--conditions", type = "character", default = NULL,
               help = "Comma-separated condition labels for samples"),
-  
+
   # Species
   make_option(c("-s", "--species"), type = "character", default = "human",
               help = "Species (human, mouse) [default: %default]"),
-  
+
   # Pre-processing
   make_option("--min_cells", type = "integer", default = 3,
               help = "Minimum cells per feature [default: %default]"),
@@ -80,13 +80,13 @@ option_list <- list(
               help = "Maximum features per cell [default: %default]"),
   make_option("--max_mt", type = "double", default = 10,
               help = "Maximum percent mitochondrial [default: %default]"),
-  
+
   # Normalization
   make_option("--normalization", type = "character", default = "LogNormalize",
               help = "Normalization method (LogNormalize, SCT) [default: %default]"),
   make_option("--n_variable_features", type = "integer", default = 2000,
               help = "Number of variable features per sample [default: %default]"),
-  
+
   # Integration method
   make_option("--method", type = "character", default = "CCAIntegration",
               help = "Integration method: CCAIntegration, RPCAIntegration, HarmonyIntegration, FastMNNIntegration [default: %default]"),
@@ -94,19 +94,19 @@ option_list <- list(
               help = "Index of reference sample (1-based) for RPCA. NULL = no reference"),
   make_option("--k_anchor", type = "integer", default = 5,
               help = "Number of anchors for integration [default: %default]"),
-  
+
   # Dimensional Reduction
   make_option("--n_pcs", type = "integer", default = 50,
               help = "Number of PCs to compute [default: %default]"),
   make_option("--dims_use", type = "character", default = "1:30",
               help = "PCs to use for integration/UMAP [default: %default]"),
-  
+
   # Clustering
   make_option("--resolution", type = "double", default = 0.5,
               help = "Clustering resolution [default: %default]"),
   make_option("--resolutions", type = "character", default = NULL,
               help = "Multiple resolutions (comma-separated) for testing"),
-  
+
   # Markers
   make_option("--find_markers", action = "store_true", default = TRUE,
               help = "Find cluster markers"),
@@ -114,7 +114,7 @@ option_list <- list(
               help = "Skip marker finding"),
   make_option("--find_conserved", action = "store_true", default = FALSE,
               help = "Find conserved markers across conditions"),
-  
+
   # General
   make_option(c("-t", "--threads"), type = "integer", default = 1,
               help = "Number of threads [default: %default]"),
@@ -124,7 +124,7 @@ option_list <- list(
               help = "Suppress messages"),
   make_option("--seed", type = "integer", default = 42,
               help = "Random seed [default: %default]"),
-  
+
   # Demo mode
   make_option("--demo", action = "store_true", default = FALSE,
               help = "Run with demo ifnb dataset from SeuratData")
@@ -204,9 +204,9 @@ if (args$method == "HarmonyIntegration") {
 
 if (args$demo) {
   log_message("Loading demo ifnb dataset (stimulated vs control PBMCs)...", log_env)
-  
+
   install_and_load(packages = "SeuratData", quiet = !args$verbose)
-  
+
   if (!"ifnb" %in% rownames(installed.packages())) {
     InstallData("ifnb")
   }
@@ -222,7 +222,7 @@ if (args$demo) {
   # For demo, split by condition
   seurat_list <- SplitObject(seurat_obj, split.by = "stim")
   sample_names <- names(seurat_list)
-  
+
 } else {
   # Parse input list
   if (file.exists(args$input_list)) {
@@ -231,7 +231,7 @@ if (args$demo) {
   } else {
     input_paths <- trimws(strsplit(args$input_list, ",")[[1]])
   }
-  
+
   # Parse sample names
   if (!is.null(args$sample_names)) {
     sample_names <- trimws(strsplit(args$sample_names, ",")[[1]])
@@ -241,12 +241,12 @@ if (args$demo) {
   } else {
     sample_names <- paste0("Sample", seq_along(input_paths))
   }
-  
+
   log_message(sprintf("Loading %d samples...", length(input_paths)), log_env)
-  
+
   seurat_list <- lapply(seq_along(input_paths), function(i) {
     log_message(sprintf("  Loading %s: %s", sample_names[i], input_paths[i]), log_env)
-    
+
     obj <- load_seurat_data(
       input_path = input_paths[i],
       input_format = args$format,
@@ -254,14 +254,14 @@ if (args$demo) {
       min_cells = args$min_cells,
       min_features = args$min_features
     )
-    
+
     # Add sample identifier to metadata
     obj$sample <- sample_names[i]
     obj$orig.ident <- sample_names[i]
-    
+
     return(obj)
   })
-  
+
   names(seurat_list) <- sample_names
 }
 
@@ -288,14 +288,14 @@ log_message("Performing QC and filtering...", log_env)
 
 seurat_list <- lapply(seurat_list, function(obj) {
   obj <- calculate_qc_metrics(obj, species = args$species)
-  
+
   obj <- subset(
     obj,
-    subset = nFeature_RNA > args$min_features & 
-             nFeature_RNA < args$max_features & 
+    subset = nFeature_RNA > args$min_features &
+             nFeature_RNA < args$max_features &
              percent.mt < args$max_mt
   )
-  
+
   return(obj)
 })
 
@@ -310,7 +310,7 @@ for (nm in names(seurat_list)) {
 log_message("Merging datasets...", log_env)
 
 seurat_obj <- merge(
-  seurat_list[[1]], 
+  seurat_list[[1]],
   y = seurat_list[-1],
   add.cell.ids = names(seurat_list),
   project = args$name
@@ -338,7 +338,7 @@ if (args$normalization == "SCT") {
   )
 } else {
   seurat_obj <- NormalizeData(seurat_obj, verbose = args$verbose)
-  seurat_obj <- FindVariableFeatures(seurat_obj, 
+  seurat_obj <- FindVariableFeatures(seurat_obj,
                                       nfeatures = args$n_variable_features,
                                       verbose = args$verbose)
   seurat_obj <- ScaleData(seurat_obj, verbose = args$verbose)
@@ -356,11 +356,11 @@ seurat_obj <- RunPCA(seurat_obj, npcs = args$n_pcs, verbose = args$verbose)
 seurat_obj <- RunUMAP(seurat_obj, dims = dims_use, reduction.name = "umap.unintegrated",
                        verbose = args$verbose)
 
-p_pre_integration <- DimPlot(seurat_obj, reduction = "umap.unintegrated", 
+p_pre_integration <- DimPlot(seurat_obj, reduction = "umap.unintegrated",
                               group.by = "orig.ident") +
   ggtitle("Before Integration")
 
-save_plot(p_pre_integration, "02_umap_before_integration.png", 
+save_plot(p_pre_integration, "02_umap_before_integration.png",
           output_dir = args$output, width = 10, height = 8)
 
 # -----------------------------------------------------------------------------
@@ -390,7 +390,7 @@ log_message("Integration complete", log_env)
 log_message("Running UMAP on integrated data...", log_env)
 
 seurat_obj <- RunUMAP(
-  seurat_obj, 
+  seurat_obj,
   reduction = "integrated",
   dims = dims_use,
   reduction.name = "umap.integrated",
@@ -398,19 +398,19 @@ seurat_obj <- RunUMAP(
 )
 
 # Comparison plot
-p_post_integration <- DimPlot(seurat_obj, reduction = "umap.integrated", 
+p_post_integration <- DimPlot(seurat_obj, reduction = "umap.integrated",
                                group.by = "orig.ident") +
   ggtitle("After Integration")
 
 p_comparison <- p_pre_integration + p_post_integration
-save_plot(p_comparison, "03_integration_comparison.png", 
+save_plot(p_comparison, "03_integration_comparison.png",
           output_dir = args$output, width = 16, height = 6)
 
 # Split by sample
-p_split <- DimPlot(seurat_obj, reduction = "umap.integrated", 
+p_split <- DimPlot(seurat_obj, reduction = "umap.integrated",
                     split.by = "orig.ident", ncol = min(length(sample_names), 4))
-save_plot(p_split, "04_umap_split_by_sample.png", 
-          output_dir = args$output, 
+save_plot(p_split, "04_umap_split_by_sample.png",
+          output_dir = args$output,
           width = min(length(sample_names), 4) * 5, height = 5)
 
 # -----------------------------------------------------------------------------
@@ -441,15 +441,15 @@ Idents(seurat_obj) <- seurat_obj[[cluster_col]][[1]]
 seurat_obj$seurat_clusters <- Idents(seurat_obj)
 
 n_clusters <- length(unique(seurat_obj$seurat_clusters))
-log_message(sprintf("Found %d clusters at resolution %.2f", 
+log_message(sprintf("Found %d clusters at resolution %.2f",
                     n_clusters, args$resolution), log_env)
 
 # Cluster visualization
-p_clusters <- DimPlot(seurat_obj, reduction = "umap.integrated", 
+p_clusters <- DimPlot(seurat_obj, reduction = "umap.integrated",
                        label = TRUE, label.size = 4) +
   ggtitle(sprintf("Integrated Clusters (res=%.2f)", args$resolution))
 
-save_plot(p_clusters, "05_umap_clusters.png", 
+save_plot(p_clusters, "05_umap_clusters.png",
           output_dir = args$output, width = 10, height = 8)
 
 # Clusters by sample
@@ -462,7 +462,7 @@ save_plot(p_clusters_split, "06_clusters_by_sample.png",
 
 # Cluster composition by sample
 cluster_comp <- table(seurat_obj$seurat_clusters, seurat_obj$orig.ident)
-write.csv(as.data.frame.matrix(cluster_comp), 
+write.csv(as.data.frame.matrix(cluster_comp),
           file.path(args$output, "cluster_composition.csv"))
 
 # -----------------------------------------------------------------------------
@@ -471,11 +471,11 @@ write.csv(as.data.frame.matrix(cluster_comp),
 
 if (args$find_markers) {
   log_message("Finding cluster markers...", log_env)
-  
+
   if (args$normalization == "SCT") {
     seurat_obj <- PrepSCTFindMarkers(seurat_obj, verbose = args$verbose)
   }
-  
+
   markers <- FindAllMarkers(
     seurat_obj,
     only.pos = TRUE,
@@ -519,9 +519,9 @@ if (args$find_markers) {
 # Conserved markers (across conditions)
 if (args$find_conserved && "condition" %in% colnames(seurat_obj@meta.data)) {
   log_message("Finding conserved markers across conditions...", log_env)
-  
+
   conserved_markers_list <- list()
-  
+
   for (cluster_id in levels(seurat_obj$seurat_clusters)) {
     tryCatch({
       conserved <- FindConservedMarkers(
@@ -533,14 +533,14 @@ if (args$find_conserved && "condition" %in% colnames(seurat_obj@meta.data)) {
       conserved$cluster <- cluster_id
       conserved_markers_list[[cluster_id]] <- conserved
     }, error = function(e) {
-      log_message(sprintf("  Warning: Could not find conserved markers for cluster %s", 
+      log_message(sprintf("  Warning: Could not find conserved markers for cluster %s",
                           cluster_id), log_env)
     })
   }
-  
+
   if (length(conserved_markers_list) > 0) {
     conserved_markers <- do.call(rbind, conserved_markers_list)
-    write.csv(conserved_markers, 
+    write.csv(conserved_markers,
               file.path(args$output, "conserved_markers.csv"))
     log_message("Conserved markers saved", log_env)
   }

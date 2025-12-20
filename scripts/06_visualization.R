@@ -2,7 +2,7 @@
 #' =============================================================================
 #' Seurat Visualization Vignette
 #' =============================================================================
-#' 
+#'
 #' This script provides comprehensive visualization capabilities for Seurat
 #' objects, implementing the visualization vignette:
 #'   - Dimensional reduction plots (PCA, UMAP, tSNE)
@@ -16,7 +16,7 @@
 #'
 #' Usage:
 #'   Rscript 06_visualization.R --input seurat.rds --output ./figures
-#' 
+#'
 #' =============================================================================
 
 # Source common utilities
@@ -52,7 +52,7 @@ option_list <- list(
               help = "Input Seurat RDS file (required)", metavar = "FILE"),
   make_option(c("-o", "--output"), type = "character", default = "output/visualization",
               help = "Output directory [default: %default]", metavar = "DIR"),
-  
+
   # Features to plot
   make_option("--features", type = "character", default = NULL,
               help = "Features to plot (comma-separated gene names)"),
@@ -60,13 +60,13 @@ option_list <- list(
               help = "CSV file with marker genes (must have 'gene' column)"),
   make_option("--top_markers", type = "integer", default = 10,
               help = "Number of top markers per cluster to plot [default: %default]"),
-  
+
   # Group/identity options
   make_option("--group_by", type = "character", default = "seurat_clusters",
               help = "Metadata column for grouping [default: %default]"),
   make_option("--split_by", type = "character", default = NULL,
               help = "Metadata column for splitting plots"),
-  
+
   # Plot types to generate
   make_option("--dim_plots", action = "store_true", default = TRUE,
               help = "Generate dimensional reduction plots"),
@@ -82,11 +82,11 @@ option_list <- list(
               help = "Generate ridge plots"),
   make_option("--scatter_plots", action = "store_true", default = FALSE,
               help = "Generate feature scatter plots"),
-  
+
   # Reduction to use
   make_option("--reduction", type = "character", default = "umap",
               help = "Reduction for dim/feature plots [default: %default]"),
-  
+
   # Plot customization
   make_option("--pt_size", type = "double", default = 0.5,
               help = "Point size for scatter plots [default: %default]"),
@@ -102,7 +102,7 @@ option_list <- list(
               help = "Plot resolution [default: %default]"),
   make_option("--format", type = "character", default = "png",
               help = "Output format: png, pdf, svg [default: %default]"),
-  
+
   # General
   make_option(c("-v", "--verbose"), action = "store_true", default = TRUE,
               help = "Verbose output"),
@@ -266,19 +266,19 @@ save_figure <- function(plot, name, w = args$width, h = args$height) {
 
 if (args$dim_plots) {
   log_message("Generating dimensional reduction plots...", log_env)
-  
+
   # Basic DimPlot
-  p_dim <- DimPlot(seurat_obj, reduction = args$reduction, 
+  p_dim <- DimPlot(seurat_obj, reduction = args$reduction,
                    group.by = args$group_by,
-                   label = args$label_clusters, 
+                   label = args$label_clusters,
                    pt.size = args$pt_size) +
     ggtitle(sprintf("%s - %s", args$reduction, args$group_by))
   save_figure(p_dim, sprintf("01_dimplot_%s", args$reduction))
-  
+
   # Split by variable if specified
   if (!is.null(args$split_by) && args$split_by %in% colnames(seurat_obj@meta.data)) {
     n_splits <- length(unique(seurat_obj@meta.data[[args$split_by]]))
-    
+
     p_split <- DimPlot(seurat_obj, reduction = args$reduction,
                        group.by = args$group_by,
                        split.by = args$split_by,
@@ -288,13 +288,13 @@ if (args$dim_plots) {
     save_figure(p_split, sprintf("02_dimplot_split_%s", args$split_by),
                 w = min(n_splits, 4) * 5, h = 5 * ceiling(n_splits/4))
   }
-  
+
   # Additional reductions if available
   for (red in c("pca", "tsne", "umap")) {
     if (red %in% available_reductions && red != args$reduction) {
-      p <- DimPlot(seurat_obj, reduction = red, 
+      p <- DimPlot(seurat_obj, reduction = red,
                    group.by = args$group_by,
-                   label = args$label_clusters, 
+                   label = args$label_clusters,
                    pt.size = args$pt_size)
       save_figure(p, sprintf("01_dimplot_%s", red))
     }
@@ -307,31 +307,31 @@ if (args$dim_plots) {
 
 if (args$feature_plots && length(features_to_plot) > 0) {
   log_message("Generating feature plots...", log_env)
-  
+
   # Split features into batches for readability
   batch_size <- 9
   n_batches <- ceiling(length(features_to_plot) / batch_size)
-  
+
   for (i in seq_len(n_batches)) {
     start_idx <- (i - 1) * batch_size + 1
     end_idx <- min(i * batch_size, length(features_to_plot))
     batch_features <- features_to_plot[start_idx:end_idx]
-    
-    p_feat <- FeaturePlot(seurat_obj, 
+
+    p_feat <- FeaturePlot(seurat_obj,
                           features = batch_features,
                           reduction = args$reduction,
                           pt.size = args$pt_size,
                           ncol = args$ncol)
-    
+
     save_figure(p_feat, sprintf("03_featureplot_batch%d", i),
                 w = args$ncol * 4, h = ceiling(length(batch_features)/args$ncol) * 4)
   }
-  
+
   # Feature plot with split
   if (!is.null(args$split_by) && length(features_to_plot) > 0) {
     top_features <- head(features_to_plot, 4)
-    
-    p_feat_split <- FeaturePlot(seurat_obj, 
+
+    p_feat_split <- FeaturePlot(seurat_obj,
                                  features = top_features,
                                  split.by = args$split_by,
                                  reduction = args$reduction,
@@ -348,32 +348,32 @@ if (args$feature_plots && length(features_to_plot) > 0) {
 
 if (args$violin_plots && length(features_to_plot) > 0) {
   log_message("Generating violin plots...", log_env)
-  
+
   # Violin plots in batches
   batch_size <- 6
   n_batches <- ceiling(length(features_to_plot) / batch_size)
-  
+
   for (i in seq_len(min(n_batches, 3))) {  # Max 3 batches
     start_idx <- (i - 1) * batch_size + 1
     end_idx <- min(i * batch_size, length(features_to_plot))
     batch_features <- features_to_plot[start_idx:end_idx]
-    
-    p_vln <- VlnPlot(seurat_obj, 
+
+    p_vln <- VlnPlot(seurat_obj,
                       features = batch_features,
                       group.by = args$group_by,
                       pt.size = 0,
                       ncol = min(length(batch_features), 3))
-    
+
     save_figure(p_vln, sprintf("04_violinplot_batch%d", i),
-                w = min(length(batch_features), 3) * 4, 
+                w = min(length(batch_features), 3) * 4,
                 h = ceiling(length(batch_features)/3) * 4)
   }
-  
+
   # Split violin
   if (!is.null(args$split_by) && length(features_to_plot) > 0) {
     top_features <- head(features_to_plot, 4)
-    
-    p_vln_split <- VlnPlot(seurat_obj, 
+
+    p_vln_split <- VlnPlot(seurat_obj,
                             features = top_features,
                             group.by = args$group_by,
                             split.by = args$split_by,
@@ -390,23 +390,23 @@ if (args$violin_plots && length(features_to_plot) > 0) {
 
 if (args$dot_plot && length(features_to_plot) > 0) {
   log_message("Generating dot plots...", log_env)
-  
+
   # Use top features for readability
   dot_features <- head(features_to_plot, 30)
-  
-  p_dot <- DotPlot(seurat_obj, 
+
+  p_dot <- DotPlot(seurat_obj,
                    features = dot_features,
                    group.by = args$group_by) +
     RotatedAxis() +
     theme(axis.text.x = element_text(size = 8))
-  
+
   save_figure(p_dot, "05_dotplot",
               w = max(8, length(dot_features) * 0.4),
               h = max(6, length(unique(Idents(seurat_obj))) * 0.4))
-  
+
   # Clustered dot plot (if have cluster column)
   if (!is.null(args$split_by)) {
-    p_dot_split <- DotPlot(seurat_obj, 
+    p_dot_split <- DotPlot(seurat_obj,
                            features = head(dot_features, 15),
                            group.by = args$group_by,
                            split.by = args$split_by) +
@@ -422,19 +422,19 @@ if (args$dot_plot && length(features_to_plot) > 0) {
 
 if (args$heatmap && length(features_to_plot) > 0) {
   log_message("Generating heatmaps...", log_env)
-  
+
   # Heatmap features
   heatmap_features <- head(features_to_plot, 50)
-  
-  p_heat <- DoHeatmap(seurat_obj, 
+
+  p_heat <- DoHeatmap(seurat_obj,
                        features = heatmap_features,
                        group.by = args$group_by,
                        size = 3) +
     theme(text = element_text(size = 8))
-  
+
   save_figure(p_heat, "06_heatmap",
               w = 12, h = max(8, length(heatmap_features) * 0.2))
-  
+
   # Scaled heatmap for top markers per cluster (if markers available)
   if (!is.null(args$marker_file) && file.exists(args$marker_file)) {
     markers_df <- read.csv(args$marker_file)
@@ -444,11 +444,11 @@ if (args$heatmap && length(features_to_plot) > 0) {
         slice_head(n = args$top_markers) %>%
         pull(gene) %>%
         unique()
-      
+
       top_by_cluster <- top_by_cluster[top_by_cluster %in% rownames(seurat_obj)]
-      
+
       if (length(top_by_cluster) > 0) {
-        p_heat_markers <- DoHeatmap(seurat_obj, 
+        p_heat_markers <- DoHeatmap(seurat_obj,
                                      features = top_by_cluster,
                                      group.by = args$group_by,
                                      size = 3) +
@@ -466,14 +466,14 @@ if (args$heatmap && length(features_to_plot) > 0) {
 
 if (args$ridge_plots && length(features_to_plot) > 0) {
   log_message("Generating ridge plots...", log_env)
-  
+
   ridge_features <- head(features_to_plot, 6)
-  
-  p_ridge <- RidgePlot(seurat_obj, 
+
+  p_ridge <- RidgePlot(seurat_obj,
                         features = ridge_features,
                         group.by = args$group_by,
                         ncol = 2)
-  
+
   save_figure(p_ridge, "07_ridgeplot",
               w = 10, h = ceiling(length(ridge_features)/2) * 4)
 }
@@ -484,21 +484,21 @@ if (args$ridge_plots && length(features_to_plot) > 0) {
 
 if (args$scatter_plots && length(features_to_plot) >= 2) {
   log_message("Generating feature scatter plots...", log_env)
-  
+
   # Plot pairs of top features
   n_pairs <- min(4, length(features_to_plot) %/% 2)
   scatter_plots <- list()
-  
+
   for (i in seq_len(n_pairs)) {
     f1 <- features_to_plot[2*i - 1]
     f2 <- features_to_plot[2*i]
-    
-    scatter_plots[[i]] <- FeatureScatter(seurat_obj, 
-                                          feature1 = f1, 
+
+    scatter_plots[[i]] <- FeatureScatter(seurat_obj,
+                                          feature1 = f1,
                                           feature2 = f2,
                                           group.by = args$group_by)
   }
-  
+
   if (length(scatter_plots) > 0) {
     p_scatter <- wrap_plots(scatter_plots, ncol = 2)
     save_figure(p_scatter, "08_feature_scatter",
@@ -517,19 +517,19 @@ qc_features <- c("nCount_RNA", "nFeature_RNA", "percent.mt", "percent.ribo")
 qc_features <- qc_features[qc_features %in% colnames(seurat_obj@meta.data)]
 
 if (length(qc_features) > 0) {
-  p_qc_vln <- VlnPlot(seurat_obj, 
+  p_qc_vln <- VlnPlot(seurat_obj,
                        features = qc_features,
                        group.by = args$group_by,
                        pt.size = 0,
                        ncol = length(qc_features))
   save_figure(p_qc_vln, "09_qc_violin", w = length(qc_features) * 3, h = 5)
-  
-  p_qc_feat <- FeaturePlot(seurat_obj, 
+
+  p_qc_feat <- FeaturePlot(seurat_obj,
                             features = qc_features,
                             reduction = args$reduction,
                             pt.size = args$pt_size * 0.5,
                             ncol = 2)
-  save_figure(p_qc_feat, "09_qc_featureplot", 
+  save_figure(p_qc_feat, "09_qc_featureplot",
               w = 8, h = ceiling(length(qc_features)/2) * 4)
 }
 

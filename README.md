@@ -1,8 +1,8 @@
 # Seurat CLI
 
-[![R Syntax Check](https://github.com/bminie/seurat-cli/actions/workflows/r-check.yml/badge.svg)](https://github.com/bminie/seurat-cli/actions/workflows/r-check.yml)
-[![Nextflow](https://github.com/bminie/seurat-cli/actions/workflows/nextflow.yml/badge.svg)](https://github.com/bminie/seurat-cli/actions/workflows/nextflow.yml)
-[![Snakemake](https://github.com/bminie/seurat-cli/actions/workflows/snakemake.yml/badge.svg)](https://github.com/bminie/seurat-cli/actions/workflows/snakemake.yml)
+[![R Syntax Check](https://github.com/bminie/seurat-cli/actions/workflows/r-check.yml/badge.svg?branch=main)](https://github.com/bminie/seurat-cli/actions/workflows/r-check.yml)
+[![Nextflow](https://github.com/bminie/seurat-cli/actions/workflows/nextflow.yml/badge.svg?branch=main)](https://github.com/bminie/seurat-cli/actions/workflows/nextflow.yml)
+[![Snakemake](https://github.com/bminie/seurat-cli/actions/workflows/snakemake.yml/badge.svg?branch=main)](https://github.com/bminie/seurat-cli/actions/workflows/snakemake.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A collection of flexible, parameterized R scripts that implement the major [Seurat](https://satijalab.org/seurat/) vignettes for single-cell RNA-seq analysis.

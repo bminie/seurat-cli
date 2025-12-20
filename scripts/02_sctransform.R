@@ -2,7 +2,7 @@
 #' =============================================================================
 #' SCTransform Normalization Vignette
 #' =============================================================================
-#' 
+#'
 #' This script implements the Seurat SCTransform vignette for improved
 #' normalization of single-cell RNA-seq data using regularized negative
 #' binomial regression.
@@ -16,7 +16,7 @@
 #'
 #' Usage:
 #'   Rscript 02_sctransform.R --input /path/to/data --output ./results
-#' 
+#'
 #' =============================================================================
 
 # Source common utilities
@@ -56,17 +56,17 @@ option_list <- list(
               help = "Project/sample name [default: %default]", metavar = "NAME"),
   make_option(c("-f", "--format"), type = "character", default = "auto",
               help = "Input format [default: %default]"),
-  
+
   # Species
   make_option(c("-s", "--species"), type = "character", default = "human",
               help = "Species for QC (human, mouse) [default: %default]"),
-  
+
   # QC Parameters
   make_option("--min_cells", type = "integer", default = 3,
               help = "Minimum cells per feature [default: %default]"),
   make_option("--min_features", type = "integer", default = 200,
               help = "Minimum features per cell [default: %default]"),
-  
+
   # SCTransform Parameters
   make_option("--n_variable_features", type = "integer", default = 3000,
               help = "Number of variable features [default: %default]"),
@@ -76,17 +76,17 @@ option_list <- list(
               help = "Return only variable genes [default: TRUE]"),
   make_option("--vst_flavor", type = "character", default = "v2",
               help = "SCTransform version: v1 or v2 [default: %default]"),
-  
+
   # Dimensional Reduction
   make_option("--n_pcs", type = "integer", default = 50,
               help = "Number of PCs to compute [default: %default]"),
   make_option("--dims_use", type = "character", default = "1:30",
               help = "PCs to use for clustering/UMAP [default: %default]"),
-  
+
   # Clustering
   make_option("--resolution", type = "double", default = 0.8,
               help = "Clustering resolution [default: %default]"),
-  
+
   # Markers
   make_option("--find_markers", action = "store_true", default = TRUE,
               help = "Find cluster markers"),
@@ -96,7 +96,7 @@ option_list <- list(
               help = "Minimum fraction for markers [default: %default]"),
   make_option("--logfc_threshold", type = "double", default = 0.25,
               help = "Log fold-change threshold [default: %default]"),
-  
+
   # General
   make_option(c("-t", "--threads"), type = "integer", default = 1,
               help = "Number of threads [default: %default]"),
@@ -106,7 +106,7 @@ option_list <- list(
               help = "Suppress messages"),
   make_option("--seed", type = "integer", default = 42,
               help = "Random seed [default: %default]"),
-  
+
   # Demo mode
   make_option("--demo", action = "store_true", default = FALSE,
               help = "Run with demo PBMC dataset from SeuratData")
@@ -189,9 +189,9 @@ if (args$vst_flavor == "v2") {
 
 if (args$demo) {
   log_message("Loading demo PBMC dataset...", log_env)
-  
+
   install_and_load(packages = "SeuratData", quiet = !args$verbose)
-  
+
   if (!"pbmc3k" %in% rownames(installed.packages())) {
     InstallData("pbmc3k")
   }
@@ -204,7 +204,7 @@ if (args$demo) {
 
 } else {
   log_message(sprintf("Loading data from: %s", args$input), log_env)
-  
+
   seurat_obj <- load_seurat_data(
     input_path = args$input,
     input_format = args$format,
@@ -214,7 +214,7 @@ if (args$demo) {
   )
 }
 
-log_message(sprintf("Loaded %d cells and %d features", 
+log_message(sprintf("Loaded %d cells and %d features",
                     ncol(seurat_obj), nrow(seurat_obj)), log_env)
 
 # -----------------------------------------------------------------------------
@@ -225,7 +225,7 @@ log_message("Calculating QC metrics...", log_env)
 seurat_obj <- calculate_qc_metrics(seurat_obj, species = args$species)
 
 # QC visualization
-p_qc <- VlnPlot(seurat_obj, 
+p_qc <- VlnPlot(seurat_obj,
                 features = c("nFeature_RNA", "nCount_RNA", "percent.mt"),
                 ncol = 3, pt.size = 0.1)
 save_plot(p_qc, "01_qc_violin.png", output_dir = args$output, width = 12, height = 5)
@@ -248,7 +248,7 @@ seurat_obj <- SCTransform(
   verbose = args$verbose
 )
 
-log_message(sprintf("SCTransform complete. %d variable features selected.", 
+log_message(sprintf("SCTransform complete. %d variable features selected.",
                     length(VariableFeatures(seurat_obj))), log_env)
 
 # Variable features plot
@@ -298,10 +298,10 @@ p_umap <- DimPlot(seurat_obj, reduction = "umap", label = TRUE, label.size = 5) 
 save_plot(p_umap, "05_umap_clusters.png", output_dir = args$output, width = 10, height = 8)
 
 # Feature plots for QC metrics
-p_qc_umap <- FeaturePlot(seurat_obj, 
+p_qc_umap <- FeaturePlot(seurat_obj,
                           features = c("nFeature_RNA", "nCount_RNA", "percent.mt"),
                           ncol = 3)
-save_plot(p_qc_umap, "06_umap_qc_features.png", output_dir = args$output, 
+save_plot(p_qc_umap, "06_umap_qc_features.png", output_dir = args$output,
           width = 15, height = 5)
 
 # -----------------------------------------------------------------------------

@@ -2,15 +2,10 @@ name: R Syntax Check
 
 on:
   push:
-    branches: [ main, develop ]
-    paths:
-      - '**.R'
-      - '.github/workflows/r-check.yml'
+    branches: [main, develop]
   pull_request:
-    branches: [ main ]
-    paths:
-      - '**.R'
-  workflow_dispatch:  # Allows manual trigger from GitHub Actions tab
+    branches: [main]
+  workflow_dispatch:
 
 jobs:
   syntax-check:

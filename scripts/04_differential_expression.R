@@ -2,7 +2,7 @@
 #' =============================================================================
 #' Differential Expression Testing Vignette
 #' =============================================================================
-#' 
+#'
 #' This script implements the Seurat differential expression vignette with
 #' flexible support for multiple DE testing frameworks:
 #'   - Wilcoxon rank sum test (default, fast)
@@ -22,7 +22,7 @@
 #'
 #' Usage:
 #'   Rscript 04_differential_expression.R --input seurat.rds --output ./de_results
-#' 
+#'
 #' =============================================================================
 
 # Source common utilities
@@ -58,11 +58,11 @@ option_list <- list(
               help = "Input Seurat RDS file (required)", metavar = "FILE"),
   make_option(c("-o", "--output"), type = "character", default = "output/de_analysis",
               help = "Output directory [default: %default]", metavar = "DIR"),
-  
+
   # Analysis mode
   make_option("--mode", type = "character", default = "all_markers",
               help = "Analysis mode: all_markers, between_clusters, between_conditions, custom [default: %default]"),
-  
+
   # Cluster-based analysis
   make_option("--cluster_col", type = "character", default = "seurat_clusters",
               help = "Metadata column containing cluster identities [default: %default]"),
@@ -70,7 +70,7 @@ option_list <- list(
               help = "Identity class 1 for comparison (for between_clusters mode)"),
   make_option("--ident_2", type = "character", default = NULL,
               help = "Identity class 2 for comparison (NULL = all other cells)"),
-  
+
   # Condition-based analysis
   make_option("--condition_col", type = "character", default = NULL,
               help = "Metadata column for condition grouping"),
@@ -80,7 +80,7 @@ option_list <- list(
               help = "Condition 2 (e.g., 'control')"),
   make_option("--subset_cluster", type = "character", default = NULL,
               help = "Subset to specific cluster for condition comparison"),
-  
+
   # DE testing parameters
   make_option("--test_use", type = "character", default = "wilcox",
               help = "Test to use: wilcox, bimod, t, poisson, negbinom, LR, MAST, DESeq2 [default: %default]"),
@@ -96,25 +96,25 @@ option_list <- list(
               help = "Minimum cells in either group [default: %default]"),
   make_option("--min_cells_feature", type = "integer", default = 3,
               help = "Minimum cells expressing feature [default: %default]"),
-  
+
   # Pseudobulk options
   make_option("--pseudobulk", action = "store_true", default = FALSE,
               help = "Use pseudobulk DE analysis (recommended for conditions)"),
   make_option("--pseudobulk_group", type = "character", default = NULL,
               help = "Metadata column for pseudobulk grouping (e.g., 'sample')"),
-  
+
   # Multiple testing
   make_option("--p_adjust_method", type = "character", default = "BH",
               help = "P-value adjustment method [default: %default]"),
   make_option("--p_threshold", type = "double", default = 0.05,
               help = "Adjusted p-value threshold for significance [default: %default]"),
-  
+
   # Output options
   make_option("--top_n", type = "integer", default = 50,
               help = "Number of top markers to plot [default: %default]"),
   make_option("--features_plot", type = "character", default = NULL,
               help = "Specific features to plot (comma-separated)"),
-  
+
   # General
   make_option(c("-t", "--threads"), type = "integer", default = 1,
               help = "Number of threads [default: %default]"),
@@ -284,7 +284,7 @@ if (args$mode == "all_markers") {
   }
 
   de_results <- do.call(FindAllMarkers, find_args)
-  
+
 } else if (args$mode == "between_clusters") {
   # Compare two clusters
   if (is.null(args$ident_1)) {
@@ -316,31 +316,31 @@ if (args$mode == "all_markers") {
 
   de_results$gene <- rownames(de_results)
   de_results$cluster <- args$ident_1
-  
+
 } else if (args$mode == "between_conditions") {
   # Compare conditions (within a cluster or globally)
   if (is.null(args$condition_col) || is.null(args$condition_1)) {
     stop("--condition_col and --condition_1 required for between_conditions mode")
   }
-  
+
   # Subset if needed
   obj_subset <- seurat_obj
   if (!is.null(args$subset_cluster)) {
     log_message(sprintf("Subsetting to cluster: %s", args$subset_cluster), log_env)
     obj_subset <- subset(seurat_obj, idents = args$subset_cluster)
   }
-  
+
   # Set identities to condition
   Idents(obj_subset) <- args$condition_col
-  
-  log_message(sprintf("Comparing conditions: %s vs %s", 
+
+  log_message(sprintf("Comparing conditions: %s vs %s",
                       args$condition_1,
                       ifelse(is.null(args$condition_2), "all others", args$condition_2)), log_env)
-  
+
   if (args$pseudobulk && !is.null(args$pseudobulk_group)) {
     # Pseudobulk DE analysis
     log_message("Running pseudobulk analysis...", log_env)
-    
+
     # Create pseudobulk counts
     bulk <- AggregateExpression(
       obj_subset,
@@ -348,9 +348,9 @@ if (args$mode == "all_markers") {
       return.seurat = TRUE,
       verbose = args$verbose
     )
-    
+
     Idents(bulk) <- args$condition_col
-    
+
     de_results <- FindMarkers(
       bulk,
       ident.1 = args$condition_1,
@@ -358,9 +358,9 @@ if (args$mode == "all_markers") {
       test.use = "DESeq2",
       verbose = args$verbose
     )
-    
+
     de_results$gene <- rownames(de_results)
-    
+
   } else {
     # Standard DE
     de_results <- FindMarkers(
@@ -373,14 +373,14 @@ if (args$mode == "all_markers") {
       test.use = args$test_use,
       verbose = args$verbose
     )
-    
+
     de_results$gene <- rownames(de_results)
   }
-  
-  de_results$comparison <- sprintf("%s_vs_%s", 
-                                    args$condition_1, 
+
+  de_results$comparison <- sprintf("%s_vs_%s",
+                                    args$condition_1,
                                     ifelse(is.null(args$condition_2), "other", args$condition_2))
-  
+
 } else if (args$mode == "custom") {
   # Custom comparison using cells.1 and cells.2 (advanced)
   log_message("Custom mode - please modify script for specific needs", log_env)
@@ -457,7 +457,7 @@ if ("cluster" %in% colnames(de_results)) {
     filter(p_val_adj < args$p_threshold) %>%
     group_by(cluster) %>%
     slice_max(n = 10, order_by = avg_log2FC)
-  
+
   write.csv(top_markers, file.path(args$output, "top_markers_per_cluster.csv"), row.names = FALSE)
 }
 
@@ -471,14 +471,14 @@ log_message("Generating visualizations...", log_env)
 make_volcano <- function(df, title = "Volcano Plot") {
   df$significant <- df$p_val_adj < args$p_threshold
   df$label <- ifelse(df$significant & abs(df$avg_log2FC) > 1, df$gene, "")
-  
+
   ggplot(df, aes(x = avg_log2FC, y = -log10(p_val_adj))) +
     geom_point(aes(color = significant), alpha = 0.6, size = 1) +
-    geom_text(aes(label = label), size = 2.5, hjust = 0, vjust = 0, 
+    geom_text(aes(label = label), size = 2.5, hjust = 0, vjust = 0,
               check_overlap = TRUE, nudge_x = 0.1) +
     scale_color_manual(values = c("gray60", "red3")) +
     geom_hline(yintercept = -log10(args$p_threshold), linetype = "dashed", color = "gray40") +
-    geom_vline(xintercept = c(-args$logfc_threshold, args$logfc_threshold), 
+    geom_vline(xintercept = c(-args$logfc_threshold, args$logfc_threshold),
                linetype = "dashed", color = "gray40") +
     theme_minimal() +
     labs(title = title, x = "Log2 Fold Change", y = "-Log10 Adjusted P-value") +
@@ -490,7 +490,7 @@ if (args$mode == "all_markers") {
   for (clust in unique(de_results$cluster)) {
     clust_results <- de_results %>% filter(cluster == clust)
     p_volcano <- make_volcano(clust_results, title = sprintf("Cluster %s Markers", clust))
-    save_plot(p_volcano, sprintf("volcano_cluster_%s.png", clust), 
+    save_plot(p_volcano, sprintf("volcano_cluster_%s.png", clust),
               output_dir = args$output, width = 8, height = 6)
   }
 } else {
@@ -505,7 +505,7 @@ if (args$mode == "all_markers" && nrow(sig_results) > 0) {
     slice_max(n = 5, order_by = avg_log2FC) %>%
     pull(gene) %>%
     unique()
-  
+
   if (length(top_genes) > 0) {
     p_heatmap <- DoHeatmap(seurat_obj, features = top_genes) +
       theme(text = element_text(size = 8))
@@ -516,19 +516,19 @@ if (args$mode == "all_markers" && nrow(sig_results) > 0) {
 
 # Feature plots for top markers
 if (nrow(sig_results) > 0) {
-  top_features <- head(sig_results$gene[order(sig_results$p_val_adj)], 
+  top_features <- head(sig_results$gene[order(sig_results$p_val_adj)],
                        min(args$top_n, 9))
-  
+
   # Check for UMAP
   if ("umap" %in% Reductions(seurat_obj)) {
-    p_features <- FeaturePlot(seurat_obj, features = top_features, 
+    p_features <- FeaturePlot(seurat_obj, features = top_features,
                                ncol = 3, reduction = "umap")
     save_plot(p_features, "feature_plots_top_markers.png", output_dir = args$output,
               width = 12, height = ceiling(length(top_features)/3) * 4)
   }
-  
+
   # Violin plots
-  p_violin <- VlnPlot(seurat_obj, features = head(top_features, 6), 
+  p_violin <- VlnPlot(seurat_obj, features = head(top_features, 6),
                        pt.size = 0, ncol = 3)
   save_plot(p_violin, "violin_plots_top_markers.png", output_dir = args$output,
             width = 12, height = 8)
@@ -538,11 +538,11 @@ if (nrow(sig_results) > 0) {
 if (!is.null(args$features_plot)) {
   features <- trimws(strsplit(args$features_plot, ",")[[1]])
   features <- features[features %in% rownames(seurat_obj)]
-  
+
   if (length(features) > 0) {
     p_custom <- FeaturePlot(seurat_obj, features = features, ncol = 3)
     save_plot(p_custom, "feature_plots_custom.png", output_dir = args$output,
-              width = 4 * min(length(features), 3), 
+              width = 4 * min(length(features), 3),
               height = 4 * ceiling(length(features)/3))
   }
 }
@@ -563,9 +563,9 @@ if (args$mode == "all_markers") {
       mean_logfc = mean(avg_log2FC),
       .groups = "drop"
     )
-  
+
   write.csv(summary_df, file.path(args$output, "de_summary_by_cluster.csv"), row.names = FALSE)
-  
+
   log_message("\nDE Summary by Cluster:", log_env)
   print(summary_df)
 }

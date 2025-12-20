@@ -2,7 +2,7 @@
 #' =============================================================================
 #' Cell Cycle Scoring and Regression Vignette
 #' =============================================================================
-#' 
+#'
 #' This script implements the Seurat cell cycle vignette for:
 #'   - Scoring cells for cell cycle phase (G1, S, G2M)
 #'   - Optionally regressing out cell cycle effects
@@ -12,7 +12,7 @@
 #'
 #' Usage:
 #'   Rscript 05_cell_cycle.R --input seurat.rds --output ./cell_cycle
-#' 
+#'
 #' =============================================================================
 
 # Source common utilities
@@ -52,11 +52,11 @@ option_list <- list(
               help = "Project/sample name [default: %default]"),
   make_option(c("-f", "--format"), type = "character", default = "auto",
               help = "Input format [default: %default]"),
-  
+
   # Species
   make_option(c("-s", "--species"), type = "character", default = "human",
               help = "Species (human, mouse) for gene lists [default: %default]"),
-  
+
   # Cell cycle options
   make_option("--s_genes", type = "character", default = NULL,
               help = "Custom S phase genes (comma-separated) or file path"),
@@ -64,7 +64,7 @@ option_list <- list(
               help = "Custom G2M phase genes (comma-separated) or file path"),
   make_option("--gene_set_version", type = "character", default = "2019",
               help = "Gene set version: 2019 (updated) or original [default: %default]"),
-  
+
   # Regression options
   make_option("--regress_cc", action = "store_true", default = FALSE,
               help = "Regress out cell cycle effects"),
@@ -72,7 +72,7 @@ option_list <- list(
               help = "Regress out difference (S - G2M) instead of both scores"),
   make_option("--vars_to_regress", type = "character", default = NULL,
               help = "Additional variables to regress (comma-separated)"),
-  
+
   # Analysis parameters
   make_option("--n_variable_features", type = "integer", default = 2000,
               help = "Number of variable features [default: %default]"),
@@ -82,7 +82,7 @@ option_list <- list(
               help = "PCs for UMAP [default: %default]"),
   make_option("--resolution", type = "double", default = 0.5,
               help = "Clustering resolution [default: %default]"),
-  
+
   # Pre-processing (if starting from raw data)
   make_option("--min_cells", type = "integer", default = 3,
               help = "Minimum cells per feature [default: %default]"),
@@ -90,7 +90,7 @@ option_list <- list(
               help = "Minimum features per cell [default: %default]"),
   make_option("--max_mt", type = "double", default = 5,
               help = "Maximum percent mitochondrial [default: %default]"),
-  
+
   # General
   make_option(c("-v", "--verbose"), action = "store_true", default = TRUE,
               help = "Verbose output"),
@@ -159,13 +159,13 @@ load_gene_list <- function(input, default_genes) {
   if (is.null(input)) {
     return(default_genes)
   }
-  
+
   if (file.exists(input)) {
     genes <- readLines(input)
   } else {
     genes <- trimws(strsplit(input, ",")[[1]])
   }
-  
+
   return(genes)
 }
 
@@ -236,7 +236,7 @@ if (args$demo) {
   }
 }
 
-log_message(sprintf("Loaded %d cells, %d features", 
+log_message(sprintf("Loaded %d cells, %d features",
                     ncol(seurat_obj), nrow(seurat_obj)), log_env)
 
 # -----------------------------------------------------------------------------
@@ -245,20 +245,20 @@ log_message(sprintf("Loaded %d cells, %d features",
 
 if (needs_preprocessing) {
   log_message("Running preprocessing...", log_env)
-  
+
   # QC
   seurat_obj <- calculate_qc_metrics(seurat_obj, species = args$species)
-  
+
   # Filter
-  seurat_obj <- filter_cells(seurat_obj, 
+  seurat_obj <- filter_cells(seurat_obj,
                               min_features = args$min_features,
                               max_mt = args$max_mt)
-  
+
   # Normalize
   seurat_obj <- NormalizeData(seurat_obj, verbose = args$verbose)
-  
+
   # Variable features
-  seurat_obj <- FindVariableFeatures(seurat_obj, 
+  seurat_obj <- FindVariableFeatures(seurat_obj,
                                       nfeatures = args$n_variable_features,
                                       verbose = args$verbose)
 }
@@ -342,7 +342,7 @@ p_pca_s <- FeaturePlot(seurat_obj, features = "S.Score", reduction = "pca") +
   ggtitle("S Score - Before Regression")
 p_pca_g2m <- FeaturePlot(seurat_obj, features = "G2M.Score", reduction = "pca") +
   ggtitle("G2M Score - Before Regression")
-save_plot(p_pca_s + p_pca_g2m, "02_pca_scores_before.png", 
+save_plot(p_pca_s + p_pca_g2m, "02_pca_scores_before.png",
           output_dir = args$output, width = 12, height = 5)
 
 # UMAP
@@ -366,10 +366,10 @@ save_plot(p_scores, "04_cc_score_distribution.png", output_dir = args$output)
 
 if (args$regress_cc || args$regress_cc_difference) {
   log_message("Regressing out cell cycle effects...", log_env)
-  
+
   # Determine what to regress
   vars_to_regress <- c()
-  
+
   if (args$regress_cc_difference) {
     vars_to_regress <- c("CC.Difference")
     log_message("  Regressing CC.Difference (S.Score - G2M.Score)", log_env)
@@ -377,14 +377,14 @@ if (args$regress_cc || args$regress_cc_difference) {
     vars_to_regress <- c("S.Score", "G2M.Score")
     log_message("  Regressing S.Score and G2M.Score", log_env)
   }
-  
+
   # Add additional variables if specified
   if (!is.null(args$vars_to_regress)) {
     extra_vars <- trimws(strsplit(args$vars_to_regress, ",")[[1]])
     vars_to_regress <- c(vars_to_regress, extra_vars)
     log_message(sprintf("  Also regressing: %s", paste(extra_vars, collapse = ", ")), log_env)
   }
-  
+
   # Re-scale with regression
   seurat_obj <- ScaleData(
     seurat_obj,
@@ -392,34 +392,34 @@ if (args$regress_cc || args$regress_cc_difference) {
     features = rownames(seurat_obj),
     verbose = args$verbose
   )
-  
+
   # Re-run PCA
   seurat_obj <- RunPCA(seurat_obj, features = VariableFeatures(seurat_obj),
                         npcs = args$n_pcs, reduction.name = "pca_regressed",
                         verbose = args$verbose)
-  
+
   # Visualize after regression
   log_message("Generating post-regression visualizations...", log_env)
-  
+
   p_pca_phase_after <- DimPlot(seurat_obj, reduction = "pca_regressed", group.by = "Phase") +
     ggtitle("PCA - After CC Regression")
   save_plot(p_pca_phase_after, "05_pca_by_phase_after.png", output_dir = args$output)
-  
+
   # UMAP after regression
-  seurat_obj <- RunUMAP(seurat_obj, dims = dims_use, 
+  seurat_obj <- RunUMAP(seurat_obj, dims = dims_use,
                          reduction = "pca_regressed",
                          reduction.name = "umap_after",
                          verbose = args$verbose)
-  
+
   p_umap_phase_after <- DimPlot(seurat_obj, reduction = "umap_after", group.by = "Phase") +
     ggtitle("UMAP - After CC Regression")
   save_plot(p_umap_phase_after, "06_umap_by_phase_after.png", output_dir = args$output)
-  
+
   # Comparison plot
   p_comparison <- (p_pca_phase + p_pca_phase_after) / (p_umap_phase + p_umap_phase_after)
-  save_plot(p_comparison, "07_before_after_comparison.png", 
+  save_plot(p_comparison, "07_before_after_comparison.png",
             output_dir = args$output, width = 12, height = 10)
-  
+
   # Use regressed reduction for downstream
   default_reduction <- "pca_regressed"
   default_umap <- "umap_after"
@@ -434,7 +434,7 @@ if (args$regress_cc || args$regress_cc_difference) {
 
 log_message("Clustering...", log_env)
 
-seurat_obj <- FindNeighbors(seurat_obj, reduction = default_reduction, 
+seurat_obj <- FindNeighbors(seurat_obj, reduction = default_reduction,
                              dims = dims_use, verbose = args$verbose)
 seurat_obj <- FindClusters(seurat_obj, resolution = args$resolution, verbose = args$verbose)
 
@@ -493,7 +493,7 @@ summary_stats <- list(
   cc_regressed = args$regress_cc || args$regress_cc_difference
 )
 
-write.csv(as.data.frame(summary_stats), 
+write.csv(as.data.frame(summary_stats),
           file.path(args$output, "analysis_summary.csv"), row.names = FALSE)
 
 # Session info

@@ -17,7 +17,7 @@
 #' @param bioc_packages Character vector of Bioconductor package names
 #' @param quiet Logical, suppress messages
 install_and_load <- function(packages = NULL, bioc_packages = NULL, quiet = FALSE) {
-  
+
   # Install CRAN packages if not present
   if (!is.null(packages)) {
     for (pkg in packages) {
@@ -28,7 +28,7 @@ install_and_load <- function(packages = NULL, bioc_packages = NULL, quiet = FALS
       suppressPackageStartupMessages(library(pkg, character.only = TRUE))
     }
   }
-  
+
   # Install Bioconductor packages if not present
   if (!is.null(bioc_packages)) {
     if (!requireNamespace("BiocManager", quietly = TRUE)) {
@@ -45,24 +45,24 @@ install_and_load <- function(packages = NULL, bioc_packages = NULL, quiet = FALS
 }
 
 #' Load core Seurat dependencies
-#' 
+#'
 #' @param include_spatial Logical, include spatial analysis packages
 #' @param include_integration Logical, include integration packages
 #' @param quiet Logical, suppress messages
-load_seurat_deps <- function(include_spatial = FALSE, 
+load_seurat_deps <- function(include_spatial = FALSE,
                               include_integration = FALSE,
                               quiet = FALSE) {
-  
+
   core_packages <- c("Seurat", "dplyr", "ggplot2", "patchwork")
-  
+
   if (include_spatial) {
     core_packages <- c(core_packages, "SeuratData")
   }
-  
+
   if (include_integration) {
     core_packages <- c(core_packages, "SeuratData")
   }
-  
+
   install_and_load(packages = core_packages, quiet = quiet)
 }
 
@@ -78,19 +78,19 @@ load_seurat_deps <- function(include_spatial = FALSE,
 #' @param min_cells Minimum cells per feature
 #' @param min_features Minimum features per cell
 #' @return Seurat object
-load_seurat_data <- function(input_path, 
+load_seurat_data <- function(input_path,
                               input_format = "auto",
                               sample_name = "Sample",
                               min_cells = 3,
                               min_features = 200) {
-  
+
   # Auto-detect format
   if (input_format == "auto") {
     input_format <- detect_input_format(input_path)
   }
-  
+
   message(sprintf("Loading data from: %s (format: %s)", input_path, input_format))
-  
+
   counts <- switch(input_format,
     "10x_h5" = {
       Read10X_h5(input_path)
@@ -124,12 +124,12 @@ load_seurat_data <- function(input_path,
     },
     stop(sprintf("Unknown input format: %s", input_format))
   )
-  
+
   # Handle multi-modal data (e.g., CITE-seq with Gene Expression and ADT)
   if (is.list(counts) && !inherits(counts, "dgCMatrix")) {
     message("Multi-modal data detected. Creating object with primary assay.")
     seurat_obj <- CreateSeuratObject(
-      counts = counts[[1]], 
+      counts = counts[[1]],
       project = sample_name,
       min.cells = min_cells,
       min.features = min_features
@@ -140,18 +140,18 @@ load_seurat_data <- function(input_path,
     }
   } else {
     seurat_obj <- CreateSeuratObject(
-      counts = counts, 
+      counts = counts,
       project = sample_name,
       min.cells = min_cells,
       min.features = min_features
     )
   }
-  
+
   return(seurat_obj)
 }
 
 #' Detect input format from file path
-#' 
+#'
 #' @param input_path Path to input data
 #' @return String indicating format
 detect_input_format <- function(input_path) {
@@ -162,7 +162,7 @@ detect_input_format <- function(input_path) {
     }
     stop("Directory provided but no recognized format found")
   }
-  
+
   ext <- tolower(tools::file_ext(input_path))
   switch(ext,
     "h5" = "10x_h5",
@@ -179,22 +179,22 @@ detect_input_format <- function(input_path) {
 # -----------------------------------------------------------------------------
 
 #' Calculate common QC metrics
-#' 
+#'
 #' @param seurat_obj Seurat object
 #' @param species Species for mitochondrial gene pattern ("human" or "mouse")
 #' @return Seurat object with QC metrics
 calculate_qc_metrics <- function(seurat_obj, species = "human") {
-  
+
   # Mitochondrial gene patterns
   mt_pattern <- switch(tolower(species),
     "human" = "^MT-",
     "mouse" = "^mt-",
     "^MT-|^mt-"  # Default: try both
   )
-  
+
   # Calculate percent mitochondrial
   seurat_obj[["percent.mt"]] <- PercentageFeatureSet(seurat_obj, pattern = mt_pattern)
-  
+
   # Calculate percent ribosomal (optional)
   rp_pattern <- switch(tolower(species),
     "human" = "^RP[SL]",
@@ -202,12 +202,12 @@ calculate_qc_metrics <- function(seurat_obj, species = "human") {
     "^RP[SL]|^Rp[sl]"
   )
   seurat_obj[["percent.ribo"]] <- PercentageFeatureSet(seurat_obj, pattern = rp_pattern)
-  
+
   return(seurat_obj)
 }
 
 #' Filter cells based on QC metrics
-#' 
+#'
 #' @param seurat_obj Seurat object
 #' @param min_features Minimum features per cell
 #' @param max_features Maximum features per cell
@@ -217,20 +217,20 @@ filter_cells <- function(seurat_obj,
                           min_features = 200,
                           max_features = Inf,
                           max_mt = 5) {
-  
+
   n_before <- ncol(seurat_obj)
-  
+
   seurat_obj <- subset(
     seurat_obj,
-    subset = nFeature_RNA > min_features & 
-             nFeature_RNA < max_features & 
+    subset = nFeature_RNA > min_features &
+             nFeature_RNA < max_features &
              percent.mt < max_mt
   )
-  
+
   n_after <- ncol(seurat_obj)
-  message(sprintf("Filtered cells: %d -> %d (removed %d)", 
+  message(sprintf("Filtered cells: %d -> %d (removed %d)",
                   n_before, n_after, n_before - n_after))
-  
+
   return(seurat_obj)
 }
 
@@ -239,7 +239,7 @@ filter_cells <- function(seurat_obj,
 # -----------------------------------------------------------------------------
 
 #' Save Seurat object
-#' 
+#'
 #' @param seurat_obj Seurat object
 #' @param output_path Output file path
 #' @param compress Logical, compress output
@@ -249,27 +249,27 @@ save_seurat <- function(seurat_obj, output_path, compress = TRUE) {
 }
 
 #' Save plot to file
-#' 
+#'
 #' @param plot ggplot object
 #' @param filename Output filename
 #' @param output_dir Output directory
 #' @param width Plot width in inches
 #' @param height Plot height in inches
 #' @param dpi Resolution
-save_plot <- function(plot, 
-                       filename, 
+save_plot <- function(plot,
+                       filename,
                        output_dir = "output",
-                       width = 10, 
-                       height = 8, 
+                       width = 10,
+                       height = 8,
                        dpi = 300) {
-  
+
   if (!dir.exists(output_dir)) {
     dir.create(output_dir, recursive = TRUE)
   }
-  
+
   output_path <- file.path(output_dir, filename)
   message(sprintf("Saving plot to: %s", output_path))
-  
+
   ggsave(
     filename = output_path,
     plot = plot,
@@ -277,12 +277,12 @@ save_plot <- function(plot,
     height = height,
     dpi = dpi
   )
-  
+
   return(output_path)
 }
 
 #' Create timestamped output directory
-#' 
+#'
 #' @param base_dir Base directory
 #' @param prefix Prefix for directory name
 #' @return Path to created directory
@@ -299,16 +299,16 @@ create_output_dir <- function(base_dir = "output", prefix = "run") {
 # -----------------------------------------------------------------------------
 
 #' Initialize logging
-#' 
+#'
 #' @param log_file Path to log file (NULL for no file logging)
 #' @param verbose Logical, print messages to console
 init_logging <- function(log_file = NULL, verbose = TRUE) {
-  
+
   log_env <- new.env()
   log_env$log_file <- log_file
   log_env$verbose <- verbose
   log_env$start_time <- Sys.time()
-  
+
   if (!is.null(log_file)) {
     log_dir <- dirname(log_file)
     if (!dir.exists(log_dir)) {
@@ -319,22 +319,22 @@ init_logging <- function(log_file = NULL, verbose = TRUE) {
       log_file
     )
   }
-  
+
   return(log_env)
 }
 
 #' Log a message
-#' 
+#'
 #' @param msg Message to log
 #' @param log_env Logging environment
 log_message <- function(msg, log_env = NULL) {
   timestamp <- format(Sys.time(), "[%Y-%m-%d %H:%M:%S]")
   full_msg <- paste(timestamp, msg)
-  
+
   if (is.null(log_env) || log_env$verbose) {
     message(full_msg)
   }
-  
+
   if (!is.null(log_env) && !is.null(log_env$log_file)) {
     cat(full_msg, "\n", file = log_env$log_file, append = TRUE)
   }
@@ -345,14 +345,14 @@ log_message <- function(msg, log_env = NULL) {
 # -----------------------------------------------------------------------------
 
 #' Parse common arguments from command line
-#' 
+#'
 #' @return optparse OptionParser object with common options
 get_common_parser <- function() {
   if (!requireNamespace("optparse", quietly = TRUE)) {
     install.packages("optparse", repos = "https://cloud.r-project.org", quiet = TRUE)
   }
   library(optparse)
-  
+
   option_list <- list(
     make_option(c("-i", "--input"), type = "character", default = NULL,
                 help = "Input file or directory path", metavar = "PATH"),
@@ -372,23 +372,23 @@ get_common_parser <- function() {
     make_option(c("-q", "--quiet"), action = "store_false", dest = "verbose",
                 help = "Suppress messages")
   )
-  
+
   return(OptionParser(option_list = option_list))
 }
 
 #' Print analysis summary
-#' 
+#'
 #' @param seurat_obj Seurat object
 print_summary <- function(seurat_obj) {
   cat("\n=== Seurat Object Summary ===\n")
   cat(sprintf("Cells: %d\n", ncol(seurat_obj)))
   cat(sprintf("Features: %d\n", nrow(seurat_obj)))
   cat(sprintf("Assays: %s\n", paste(Assays(seurat_obj), collapse = ", ")))
-  
+
   if (length(Reductions(seurat_obj)) > 0) {
     cat(sprintf("Reductions: %s\n", paste(Reductions(seurat_obj), collapse = ", ")))
   }
-  
+
   if ("seurat_clusters" %in% colnames(seurat_obj@meta.data)) {
     cat(sprintf("Clusters: %d\n", length(unique(seurat_obj$seurat_clusters))))
   }

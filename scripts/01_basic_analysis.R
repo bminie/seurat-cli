@@ -17,7 +17,7 @@
 #'
 #' Usage:
 #'   Rscript 01_basic_analysis.R --input /path/to/data --output ./results
-#' 
+#'
 #' =============================================================================
 
 # Source common utilities
@@ -57,11 +57,11 @@ option_list <- list(
               help = "Project/sample name [default: %default]", metavar = "NAME"),
   make_option(c("-f", "--format"), type = "character", default = "auto",
               help = "Input format (auto, 10x_h5, 10x_mtx, rds, csv) [default: %default]"),
-  
+
   # Species
   make_option(c("-s", "--species"), type = "character", default = "human",
               help = "Species for QC (human, mouse) [default: %default]"),
-  
+
   # QC Parameters
   make_option("--min_cells", type = "integer", default = 3,
               help = "Minimum cells per feature [default: %default]"),
@@ -71,31 +71,31 @@ option_list <- list(
               help = "Maximum features per cell [default: %default]"),
   make_option("--max_mt", type = "double", default = 5,
               help = "Maximum percent mitochondrial [default: %default]"),
-  
+
   # Normalization
   make_option("--norm_method", type = "character", default = "LogNormalize",
               help = "Normalization method [default: %default]"),
   make_option("--scale_factor", type = "double", default = 10000,
               help = "Scale factor for normalization [default: %default]"),
-  
+
   # Variable Features
   make_option("--n_variable_features", type = "integer", default = 2000,
               help = "Number of variable features [default: %default]"),
   make_option("--selection_method", type = "character", default = "vst",
               help = "Variable feature selection method [default: %default]"),
-  
+
   # Dimensional Reduction
   make_option("--n_pcs", type = "integer", default = 50,
               help = "Number of PCs to compute [default: %default]"),
   make_option("--dims_use", type = "character", default = "1:10",
               help = "PCs to use for clustering/UMAP (e.g., '1:10' or '1,2,3,5') [default: %default]"),
-  
+
   # Clustering
   make_option("--resolution", type = "double", default = 0.5,
               help = "Clustering resolution [default: %default]"),
   make_option("--algorithm", type = "integer", default = 1,
               help = "Clustering algorithm (1=Louvain, 2=Louvain/multilevel, 3=SLM, 4=Leiden) [default: %default]"),
-  
+
   # Markers
   make_option("--find_markers", action = "store_true", default = TRUE,
               help = "Find cluster markers [default: TRUE]"),
@@ -107,7 +107,7 @@ option_list <- list(
               help = "Log fold-change threshold for markers [default: %default]"),
   make_option("--test_use", type = "character", default = "wilcox",
               help = "Statistical test for markers [default: %default]"),
-  
+
   # General
   make_option(c("-t", "--threads"), type = "integer", default = 1,
               help = "Number of threads [default: %default]"),
@@ -117,7 +117,7 @@ option_list <- list(
               help = "Suppress messages"),
   make_option("--seed", type = "integer", default = 42,
               help = "Random seed [default: %default]"),
-  
+
   # Demo mode
   make_option("--demo", action = "store_true", default = FALSE,
               help = "Run with demo PBMC3K dataset from SeuratData")
@@ -190,9 +190,9 @@ load_seurat_deps(quiet = !args$verbose)
 
 if (args$demo) {
   log_message("Loading demo PBMC3K dataset from SeuratData...", log_env)
-  
+
   install_and_load(packages = "SeuratData", quiet = !args$verbose)
-  
+
   # Install and load pbmc3k dataset
   if (!"pbmc3k" %in% rownames(installed.packages())) {
     InstallData("pbmc3k")
@@ -209,10 +209,10 @@ if (args$demo) {
 
   # Update to current Seurat version format (v5 compatibility)
   seurat_obj <- UpdateSeuratObject(seurat_obj)
-  
+
 } else {
   log_message(sprintf("Loading data from: %s", args$input), log_env)
-  
+
   seurat_obj <- load_seurat_data(
     input_path = args$input,
     input_format = args$format,
@@ -222,7 +222,7 @@ if (args$demo) {
   )
 }
 
-log_message(sprintf("Loaded %d cells and %d features", 
+log_message(sprintf("Loaded %d cells and %d features",
                     ncol(seurat_obj), nrow(seurat_obj)), log_env)
 
 # -----------------------------------------------------------------------------
@@ -235,13 +235,13 @@ seurat_obj <- calculate_qc_metrics(seurat_obj, species = args$species)
 
 # Generate QC violin plot
 p_qc_violin <- VlnPlot(
-  seurat_obj, 
+  seurat_obj,
   features = c("nFeature_RNA", "nCount_RNA", "percent.mt"),
   ncol = 3,
   pt.size = 0.1
 )
 
-save_plot(p_qc_violin, "01_qc_violin.png", output_dir = args$output, 
+save_plot(p_qc_violin, "01_qc_violin.png", output_dir = args$output,
           width = 12, height = 5)
 
 # Generate QC scatter plots
@@ -268,7 +268,7 @@ log_message(sprintf("After filtering: %d cells", ncol(seurat_obj)), log_env)
 # Normalization
 # -----------------------------------------------------------------------------
 
-log_message(sprintf("Normalizing data (method: %s, scale_factor: %.0f)...", 
+log_message(sprintf("Normalizing data (method: %s, scale_factor: %.0f)...",
                     args$norm_method, args$scale_factor), log_env)
 
 seurat_obj <- NormalizeData(
@@ -342,9 +342,9 @@ p_elbow <- ElbowPlot(seurat_obj, ndims = min(args$n_pcs, 30))
 save_plot(p_elbow, "05_elbow_plot.png", output_dir = args$output, width = 8, height = 5)
 
 # PCA loadings heatmap
-p_heatmap <- DimHeatmap(seurat_obj, dims = 1:min(9, length(dims_use)), 
+p_heatmap <- DimHeatmap(seurat_obj, dims = 1:min(9, length(dims_use)),
                         cells = 500, balanced = TRUE)
-save_plot(p_heatmap, "06_pca_heatmap.png", output_dir = args$output, 
+save_plot(p_heatmap, "06_pca_heatmap.png", output_dir = args$output,
           width = 12, height = 12)
 
 # -----------------------------------------------------------------------------
@@ -359,7 +359,7 @@ seurat_obj <- FindNeighbors(
   verbose = args$verbose
 )
 
-log_message(sprintf("Clustering (resolution: %.2f, algorithm: %d)...", 
+log_message(sprintf("Clustering (resolution: %.2f, algorithm: %d)...",
                     args$resolution, args$algorithm), log_env)
 
 seurat_obj <- FindClusters(
@@ -388,7 +388,7 @@ seurat_obj <- RunUMAP(
 p_umap <- DimPlot(seurat_obj, reduction = "umap", label = TRUE, label.size = 5) +
   ggtitle(sprintf("%s - UMAP (res=%.2f)", args$name, args$resolution))
 
-save_plot(p_umap, "07_umap_clusters.png", output_dir = args$output, 
+save_plot(p_umap, "07_umap_clusters.png", output_dir = args$output,
           width = 10, height = 8)
 
 # -----------------------------------------------------------------------------

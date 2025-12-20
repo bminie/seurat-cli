@@ -3,13 +3,8 @@ name: Snakemake
 on:
   push:
     branches: [main, develop]
-    paths:
-      - 'workflows/snakemake/**'
-      - '.github/workflows/snakemake.yml'
   pull_request:
     branches: [main]
-    paths:
-      - 'workflows/snakemake/**'
   workflow_dispatch:
 
 jobs:
