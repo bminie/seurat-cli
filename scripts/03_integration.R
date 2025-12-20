@@ -419,18 +419,25 @@ save_plot(p_split, "04_umap_split_by_sample.png",
 
 log_message("Clustering integrated data...", log_env)
 
-seurat_obj <- FindNeighbors(seurat_obj, reduction = "integrated", 
-                             dims = dims_use, verbose = args$verbose)
+# Use explicit graph name for consistency
+graph_name <- "integrated_snn"
+seurat_obj <- FindNeighbors(seurat_obj, reduction = "integrated",
+                             dims = dims_use,
+                             graph.name = c(paste0(graph_name, "_nn"), graph_name),
+                             verbose = args$verbose)
 
 # Run clustering at specified resolution(s)
 for (res in resolutions) {
   log_message(sprintf("  Clustering at resolution %.2f", res), log_env)
-  
-  seurat_obj <- FindClusters(seurat_obj, resolution = res, verbose = args$verbose)
+
+  seurat_obj <- FindClusters(seurat_obj, resolution = res,
+                              graph.name = graph_name,
+                              verbose = args$verbose)
 }
 
 # Use primary resolution for default clustering
-Idents(seurat_obj) <- paste0("integrated_snn_res.", args$resolution)
+cluster_col <- paste0(graph_name, "_res.", args$resolution)
+Idents(seurat_obj) <- seurat_obj[[cluster_col]][[1]]
 seurat_obj$seurat_clusters <- Idents(seurat_obj)
 
 n_clusters <- length(unique(seurat_obj$seurat_clusters))

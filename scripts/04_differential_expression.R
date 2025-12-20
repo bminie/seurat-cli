@@ -163,9 +163,12 @@ log_message("Starting differential expression analysis", log_env)
 log_message(sprintf("Mode: %s", args$mode), log_env)
 log_message(sprintf("Test: %s", args$test_use), log_env)
 
+# Note: future parallelization with multisession can cause issues with
+# FindAllMarkers/FindMarkers in Seurat (returns 0 results due to serialization issues).
+# Using sequential processing for reliability. Seurat's presto package provides
+# fast marker finding without needing future parallelization.
 if (args$threads > 1) {
-  library(future)
-  plan(multisession, workers = args$threads)
+  log_message(sprintf("Note: Using %d threads (presto acceleration if available)", args$threads), log_env)
 }
 
 # -----------------------------------------------------------------------------
@@ -216,14 +219,42 @@ if (args$demo) {
   seurat_obj <- readRDS(args$input)
 }
 
-log_message(sprintf("Loaded %d cells, %d features", 
+log_message(sprintf("Loaded %d cells, %d features",
                     ncol(seurat_obj), nrow(seurat_obj)), log_env)
+
+# Check for SCTransform data and prepare for marker finding
+default_assay <- DefaultAssay(seurat_obj)
+log_message(sprintf("Default assay: %s", default_assay), log_env)
+
+# Seurat v5 requires JoinLayers before FindMarkers/FindAllMarkers
+# Check if layers need to be joined (v5 feature)
+if (packageVersion("SeuratObject") >= "5.0.0") {
+  # Check if data is stored in multiple layers
+  assay_obj <- seurat_obj[[default_assay]]
+  layer_names <- Layers(assay_obj)
+
+  # If there are multiple data layers (e.g., data.1, data.2), join them
+  data_layers <- grep("^data", layer_names, value = TRUE)
+  if (length(data_layers) > 1) {
+    log_message(sprintf("Multiple data layers detected (%s) - joining layers...",
+                        paste(data_layers, collapse = ", ")), log_env)
+    seurat_obj <- JoinLayers(seurat_obj)
+    log_message("Layers joined successfully", log_env)
+  }
+}
+
+# PrepSCTFindMarkers is required before FindMarkers/FindAllMarkers on SCT data
+if (default_assay == "SCT") {
+  log_message("SCT assay detected - running PrepSCTFindMarkers...", log_env)
+  seurat_obj <- PrepSCTFindMarkers(seurat_obj, verbose = args$verbose)
+  log_message("PrepSCTFindMarkers complete", log_env)
+}
 
 # Set identities
 if (args$cluster_col %in% colnames(seurat_obj@meta.data)) {
   Idents(seurat_obj) <- args$cluster_col
   log_message(sprintf("Using identity column: %s", args$cluster_col), log_env)
-  log_message(sprintf("Identities: %s", 
+  log_message(sprintf("Identities: %s",
                       paste(levels(Idents(seurat_obj)), collapse = ", ")), log_env)
 }
 
@@ -236,40 +267,53 @@ de_results <- NULL
 if (args$mode == "all_markers") {
   # Find markers for all clusters
   log_message("Finding markers for all clusters...", log_env)
-  
-  de_results <- FindAllMarkers(
-    seurat_obj,
+
+  # Build argument list - only include max.cells.per.ident if specified
+  # (passing NULL explicitly breaks FindAllMarkers in some Seurat versions)
+  find_args <- list(
+    object = seurat_obj,
     only.pos = args$only_pos,
     min.pct = args$min_pct,
     logfc.threshold = args$logfc_threshold,
     test.use = args$test_use,
-    max.cells.per.ident = args$max_cells_per_ident,
     min.cells.group = args$min_cells_group,
     verbose = args$verbose
   )
+  if (!is.null(args$max_cells_per_ident)) {
+    find_args$max.cells.per.ident <- args$max_cells_per_ident
+  }
+
+  de_results <- do.call(FindAllMarkers, find_args)
   
 } else if (args$mode == "between_clusters") {
   # Compare two clusters
   if (is.null(args$ident_1)) {
     stop("--ident_1 is required for between_clusters mode")
   }
-  
-  log_message(sprintf("Finding markers: %s vs %s", 
-                      args$ident_1, 
+
+  log_message(sprintf("Finding markers: %s vs %s",
+                      args$ident_1,
                       ifelse(is.null(args$ident_2), "all others", args$ident_2)), log_env)
-  
-  de_results <- FindMarkers(
-    seurat_obj,
+
+  # Build argument list - only include optional args if specified
+  find_args <- list(
+    object = seurat_obj,
     ident.1 = args$ident_1,
-    ident.2 = args$ident_2,
     only.pos = args$only_pos,
     min.pct = args$min_pct,
     logfc.threshold = args$logfc_threshold,
     test.use = args$test_use,
-    max.cells.per.ident = args$max_cells_per_ident,
     verbose = args$verbose
   )
-  
+  if (!is.null(args$ident_2)) {
+    find_args$ident.2 <- args$ident_2
+  }
+  if (!is.null(args$max_cells_per_ident)) {
+    find_args$max.cells.per.ident <- args$max_cells_per_ident
+  }
+
+  de_results <- do.call(FindMarkers, find_args)
+
   de_results$gene <- rownames(de_results)
   de_results$cluster <- args$ident_1
   
