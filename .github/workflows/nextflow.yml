@@ -1,0 +1,51 @@
+name: Nextflow
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'workflows/nextflow/**'
+      - '.github/workflows/nextflow.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'workflows/nextflow/**'
+  workflow_dispatch:
+
+jobs:
+  lint:
+    name: Nextflow Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Nextflow
+        uses: nf-core/setup-nextflow@v2
+
+      - name: Check Nextflow version
+        run: nextflow -version
+
+      - name: Validate pipeline syntax
+        run: |
+          cd workflows/nextflow
+          nextflow run main.nf --help
+
+      - name: Run dry-run with test profile
+        run: |
+          cd workflows/nextflow
+          nextflow run main.nf -profile test -preview
+        continue-on-error: true  # Preview may not work on all Nextflow versions
+
+  config-check:
+    name: Config Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Nextflow
+        uses: nf-core/setup-nextflow@v2
+
+      - name: Validate config syntax
+        run: |
+          cd workflows/nextflow
+          nextflow config main.nf -profile test

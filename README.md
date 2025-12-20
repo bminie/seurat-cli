@@ -1,6 +1,8 @@
 # Seurat CLI
 
 [![R Syntax Check](https://github.com/bminie/seurat-cli/actions/workflows/r-check.yml/badge.svg)](https://github.com/bminie/seurat-cli/actions/workflows/r-check.yml)
+[![Nextflow](https://github.com/bminie/seurat-cli/actions/workflows/nextflow.yml/badge.svg)](https://github.com/bminie/seurat-cli/actions/workflows/nextflow.yml)
+[![Snakemake](https://github.com/bminie/seurat-cli/actions/workflows/snakemake.yml/badge.svg)](https://github.com/bminie/seurat-cli/actions/workflows/snakemake.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A collection of flexible, parameterized R scripts that implement the major [Seurat](https://satijalab.org/seurat/) vignettes for single-cell RNA-seq analysis.
@@ -604,6 +606,10 @@ While these scripts faithfully implement the Seurat vignettes, they include seve
 - [PBMC 3K Tutorial](https://satijalab.org/seurat/articles/pbmc3k_tutorial)
 - [SCTransform Paper](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-019-1874-1)
 - [Integration Methods](https://satijalab.org/seurat/articles/integration_introduction)
+
+## Author
+
+Created and maintained by [@bminie](https://github.com/bminie).
 
 ## Contributing
 
