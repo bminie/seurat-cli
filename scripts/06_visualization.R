@@ -35,7 +35,7 @@ get_script_dir <- function() {
     }
   }
   # Fallback to current directory
-  return(".")
+  "."
 }
 script_dir <- get_script_dir()
 source(file.path(script_dir, "..", "utils", "common.R"))
@@ -439,10 +439,10 @@ if (args$heatmap && length(features_to_plot) > 0) {
   if (!is.null(args$marker_file) && file.exists(args$marker_file)) {
     markers_df <- read.csv(args$marker_file)
     if ("cluster" %in% colnames(markers_df) && "gene" %in% colnames(markers_df)) {
-      top_by_cluster <- markers_df %>%
-        group_by(cluster) %>%
-        slice_head(n = args$top_markers) %>%
-        pull(gene) %>%
+      top_by_cluster <- markers_df |>
+        group_by(cluster) |>
+        slice_head(n = args$top_markers) |>
+        pull(gene) |>
         unique()
 
       top_by_cluster <- top_by_cluster[top_by_cluster %in% rownames(seurat_obj)]

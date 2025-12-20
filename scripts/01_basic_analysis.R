@@ -36,7 +36,7 @@ get_script_dir <- function() {
     }
   }
   # Fallback to current directory
-  return(".")
+  "."
 }
 script_dir <- get_script_dir()
 source(file.path(script_dir, "..", "utils", "common.R"))
@@ -144,9 +144,9 @@ if (!args$demo && is.null(args$input)) {
 parse_dims <- function(dims_str) {
   if (grepl(":", dims_str)) {
     parts <- as.integer(strsplit(dims_str, ":")[[1]])
-    return(seq(parts[1], parts[2]))
+    seq(parts[1], parts[2])
   } else {
-    return(as.integer(strsplit(dims_str, ",")[[1]]))
+    as.integer(strsplit(dims_str, ",")[[1]])
   }
 }
 dims_use <- parse_dims(args$dims_use)
@@ -342,7 +342,7 @@ p_elbow <- ElbowPlot(seurat_obj, ndims = min(args$n_pcs, 30))
 save_plot(p_elbow, "05_elbow_plot.png", output_dir = args$output, width = 8, height = 5)
 
 # PCA loadings heatmap
-p_heatmap <- DimHeatmap(seurat_obj, dims = 1:min(9, length(dims_use)),
+p_heatmap <- DimHeatmap(seurat_obj, dims = seq_len(min(9, length(dims_use))),
                         cells = 500, balanced = TRUE)
 save_plot(p_heatmap, "06_pca_heatmap.png", output_dir = args$output,
           width = 12, height = 12)
@@ -418,16 +418,16 @@ if (args$find_markers) {
     write.csv(markers, file.path(args$output, "cluster_markers_all.csv"), row.names = FALSE)
 
     # Get top markers per cluster
-    top_markers <- markers %>%
-      group_by(cluster) %>%
+    top_markers <- markers |>
+      group_by(cluster) |>
       slice_max(n = 10, order_by = avg_log2FC)
 
     write.csv(top_markers, file.path(args$output, "cluster_markers_top10.csv"), row.names = FALSE)
 
     # Heatmap of top markers
-    top5_per_cluster <- markers %>%
-      group_by(cluster) %>%
-      slice_max(n = 5, order_by = avg_log2FC) %>%
+    top5_per_cluster <- markers |>
+      group_by(cluster) |>
+      slice_max(n = 5, order_by = avg_log2FC) |>
       pull(gene)
 
     if (length(top5_per_cluster) > 0) {

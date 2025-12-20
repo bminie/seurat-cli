@@ -38,7 +38,7 @@ get_script_dir <- function() {
     }
   }
   # Fallback to current directory
-  return(".")
+  "."
 }
 script_dir <- get_script_dir()
 source(file.path(script_dir, "..", "utils", "common.R"))
@@ -151,9 +151,10 @@ if (!args$demo && is.null(args$input_list)) {
 parse_dims <- function(dims_str) {
   if (grepl(":", dims_str)) {
     parts <- as.integer(strsplit(dims_str, ":")[[1]])
-    return(seq(parts[1], parts[2]))
+    seq(parts[1], parts[2])
+  } else {
+    as.integer(strsplit(dims_str, ",")[[1]])
   }
-  return(as.integer(strsplit(dims_str, ",")[[1]]))
 }
 dims_use <- parse_dims(args$dims_use)
 
@@ -493,8 +494,8 @@ if (args$find_markers) {
   } else {
     write.csv(markers, file.path(args$output, "cluster_markers_all.csv"), row.names = FALSE)
 
-    top_markers <- markers %>%
-      group_by(cluster) %>%
+    top_markers <- markers |>
+      group_by(cluster) |>
       slice_max(n = 10, order_by = avg_log2FC)
 
     write.csv(top_markers, file.path(args$output, "cluster_markers_top10.csv"), row.names = FALSE)
@@ -502,9 +503,9 @@ if (args$find_markers) {
     log_message(sprintf("Found %d markers", nrow(markers)), log_env)
 
     # Marker heatmap
-    top5 <- markers %>%
-      group_by(cluster) %>%
-      slice_max(n = 5, order_by = avg_log2FC) %>%
+    top5 <- markers |>
+      group_by(cluster) |>
+      slice_max(n = 5, order_by = avg_log2FC) |>
       pull(gene)
 
     if (length(top5) > 0) {

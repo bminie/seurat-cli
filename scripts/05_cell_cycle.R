@@ -31,7 +31,7 @@ get_script_dir <- function() {
     }
   }
   # Fallback to current directory
-  return(".")
+  "."
 }
 script_dir <- get_script_dir()
 source(file.path(script_dir, "..", "utils", "common.R"))
@@ -120,9 +120,10 @@ if (!args$demo && is.null(args$input)) {
 parse_dims <- function(dims_str) {
   if (grepl(":", dims_str)) {
     parts <- as.integer(strsplit(dims_str, ":")[[1]])
-    return(seq(parts[1], parts[2]))
+    seq(parts[1], parts[2])
+  } else {
+    as.integer(strsplit(dims_str, ",")[[1]])
   }
-  return(as.integer(strsplit(dims_str, ",")[[1]]))
 }
 dims_use <- parse_dims(args$dims_use)
 

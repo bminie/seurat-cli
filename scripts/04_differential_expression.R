@@ -41,7 +41,7 @@ get_script_dir <- function() {
     }
   }
   # Fallback to current directory
-  return(".")
+  "."
 }
 script_dir <- get_script_dir()
 source(file.path(script_dir, "..", "utils", "common.R"))
@@ -432,7 +432,7 @@ if (!"p_val_adj" %in% colnames(de_results) && "p_val" %in% colnames(de_results))
 }
 
 # Filter significant results
-sig_results <- de_results %>%
+sig_results <- de_results |>
   filter(p_val_adj < args$p_threshold)
 
 log_message(sprintf("Total DE genes: %d", nrow(de_results)), log_env)
@@ -453,9 +453,9 @@ write.csv(sig_results, file.path(args$output, "de_results_significant.csv"), row
 
 # Top markers per cluster (if applicable)
 if ("cluster" %in% colnames(de_results)) {
-  top_markers <- de_results %>%
-    filter(p_val_adj < args$p_threshold) %>%
-    group_by(cluster) %>%
+  top_markers <- de_results |>
+    filter(p_val_adj < args$p_threshold) |>
+    group_by(cluster) |>
     slice_max(n = 10, order_by = avg_log2FC)
 
   write.csv(top_markers, file.path(args$output, "top_markers_per_cluster.csv"), row.names = FALSE)
@@ -488,7 +488,7 @@ make_volcano <- function(df, title = "Volcano Plot") {
 # Generate volcano plots
 if (args$mode == "all_markers") {
   for (clust in unique(de_results$cluster)) {
-    clust_results <- de_results %>% filter(cluster == clust)
+    clust_results <- de_results |> filter(cluster == clust)
     p_volcano <- make_volcano(clust_results, title = sprintf("Cluster %s Markers", clust))
     save_plot(p_volcano, sprintf("volcano_cluster_%s.png", clust),
               output_dir = args$output, width = 8, height = 6)
@@ -500,10 +500,10 @@ if (args$mode == "all_markers") {
 
 # Heatmap of top markers
 if (args$mode == "all_markers" && nrow(sig_results) > 0) {
-  top_genes <- sig_results %>%
-    group_by(cluster) %>%
-    slice_max(n = 5, order_by = avg_log2FC) %>%
-    pull(gene) %>%
+  top_genes <- sig_results |>
+    group_by(cluster) |>
+    slice_max(n = 5, order_by = avg_log2FC) |>
+    pull(gene) |>
     unique()
 
   if (length(top_genes) > 0) {
@@ -553,8 +553,8 @@ if (!is.null(args$features_plot)) {
 
 # Summary by cluster (for all_markers mode)
 if (args$mode == "all_markers") {
-  summary_df <- de_results %>%
-    group_by(cluster) %>%
+  summary_df <- de_results |>
+    group_by(cluster) |>
     summarise(
       total_de_genes = n(),
       significant = sum(p_val_adj < args$p_threshold),
