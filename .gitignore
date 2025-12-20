@@ -116,3 +116,13 @@ packrat/lib*/
 # Quarto
 .quarto/
 /_site/
+
+# Snakemake
+.snakemake/
+*.snakemake.*
+
+# Nextflow
+.nextflow/
+.nextflow.log*
+work/
+demo_results/
