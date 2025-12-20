@@ -1,0 +1,81 @@
+# =============================================================================
+# Seurat CLI - Full Environment
+# =============================================================================
+#
+# Complete environment with R, Seurat, Snakemake, and Nextflow.
+# Use this for running workflow pipelines.
+#
+# IMPORTANT: Use mamba instead of conda for installation!
+# This environment has complex dependencies that can take 30+ minutes with
+# conda, or fail entirely. Mamba typically completes in 2-5 minutes.
+#
+# Installation with mamba (RECOMMENDED):
+#   mamba env create -f environment.yml
+#   conda activate seurat-cli
+#
+# Install mamba if needed:
+#   conda install -n base -c conda-forge mamba
+#
+# Installation with conda (slower, may fail):
+#   conda env create -f environment.yml
+#   conda activate seurat-cli
+#
+# =============================================================================
+
+name: seurat-cli
+
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+
+dependencies:
+  # R and base packages
+  - r-base>=4.2
+  - r-essentials
+
+  # Seurat and dependencies
+  - r-seurat>=5.0
+  - r-seuratobject
+
+  # Required R packages
+  - r-dplyr
+  - r-ggplot2
+  - r-patchwork
+  - r-optparse
+  - r-matrix
+  - r-future
+  - r-viridis
+  - r-hdf5r
+  - r-r.utils
+
+  # SCTransform dependencies
+  - r-sctransform
+  - bioconductor-glmgampoi
+
+  # Differential expression packages
+  - bioconductor-mast
+  - bioconductor-deseq2
+  - bioconductor-singlecellexperiment
+
+  # Integration packages
+  - r-harmony
+  - bioconductor-batchelor
+
+  # Faster marker finding
+  - r-devtools  # For installing presto from GitHub
+
+  # Workflow managers
+  - snakemake>=7.0
+  - nextflow>=21.04
+
+  # Java (required for Nextflow)
+  - openjdk>=11
+
+  # Utilities
+  - graphviz  # For DAG visualization
+
+  # pip packages (if needed)
+  - pip
+  - pip:
+    - snakemake-executor-plugin-cluster-generic

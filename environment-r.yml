@@ -1,0 +1,65 @@
+# =============================================================================
+# Seurat CLI - R-Only Environment
+# =============================================================================
+#
+# Lightweight environment with R and Seurat packages only.
+# Use this if you only need to run the R scripts directly (not pipelines).
+#
+# IMPORTANT: Use mamba instead of conda for installation!
+# Mamba is significantly faster at resolving dependencies.
+#
+# Installation with mamba (RECOMMENDED):
+#   mamba env create -f environment-r.yml
+#   conda activate seurat-cli-r
+#
+# Install mamba if needed:
+#   conda install -n base -c conda-forge mamba
+#
+# Installation with conda (slower):
+#   conda env create -f environment-r.yml
+#   conda activate seurat-cli-r
+#
+# =============================================================================
+
+name: seurat-cli-r
+
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+
+dependencies:
+  # R and base packages
+  - r-base>=4.2
+  - r-essentials
+
+  # Seurat and dependencies
+  - r-seurat>=5.0
+  - r-seuratobject
+
+  # Required R packages
+  - r-dplyr
+  - r-ggplot2
+  - r-patchwork
+  - r-optparse
+  - r-matrix
+  - r-future
+  - r-viridis
+  - r-hdf5r
+  - r-r.utils
+
+  # SCTransform dependencies
+  - r-sctransform
+  - bioconductor-glmgampoi
+
+  # Differential expression packages (optional but recommended)
+  - bioconductor-mast
+  - bioconductor-deseq2
+  - bioconductor-singlecellexperiment
+
+  # Integration packages
+  - r-harmony
+  - bioconductor-batchelor
+
+  # Faster marker finding
+  - r-devtools  # For installing presto from GitHub
