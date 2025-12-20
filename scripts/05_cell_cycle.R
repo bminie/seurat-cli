@@ -468,6 +468,13 @@ write.csv(cluster_cc_comp, file.path(args$output, "cluster_cc_composition.csv"),
 
 log_message("Saving results...", log_env)
 
+# Save cluster assignments
+cluster_assignments <- data.frame(
+  cell = colnames(seurat_obj),
+  cluster = as.integer(as.character(seurat_obj$seurat_clusters))
+)
+write.csv(cluster_assignments, file.path(args$output, "cluster_assignments.csv"), row.names = FALSE)
+
 save_seurat(seurat_obj, file.path(args$output, "seurat_cell_cycle.rds"))
 
 # Summary statistics
