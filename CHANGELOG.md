@@ -8,13 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Nothing yet
+- Two-tier validation framework (`tests/validate_outputs.R`)
+  - Tier 1: Structural validation (file existence, CSV structure, cluster assignments, Seurat object integrity)
+  - Tier 2: Biological validation for demo datasets (expected cluster counts, cell counts, known markers)
+- New test runner options: `--skip_validation`, `--validation_only`
+- `cluster_assignments.csv` output for cell cycle script (05) for consistency with other scripts
 
 ### Changed
-- Nothing yet
+- `tests/run_demo_tests.R` now integrates the validation framework and reports detailed check counts
 
 ### Fixed
-- Nothing yet
+- Fixed clustering bug in `scripts/03_integration.R` where `FindNeighbors`/`FindClusters` used incorrect graph names, causing all cells to be assigned to a single cluster instead of the expected 15 clusters. The fix explicitly sets `graph.name` parameter to ensure consistent graph naming across Seurat v5.
 
 ## [1.0.0] - 2024-12-16
 

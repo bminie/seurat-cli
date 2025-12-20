@@ -15,14 +15,65 @@ These scripts provide command-line interfaces to common Seurat workflows, allowi
 
 ## Installation
 
+### Prerequisites
+
+Before installing, ensure you have one of the following:
+
+**For Option 1 (Mamba - Recommended):**
+- [Miniforge](https://github.com/conda-forge/miniforge#miniforge3) (includes mamba) - **Recommended**
+- Or install mamba into existing conda: `conda install -n base -c conda-forge mamba`
+
+> **Note:** We strongly recommend mamba over conda. Mamba uses a faster C++ dependency solver and typically completes environment creation in 2-5 minutes, while conda can take 30+ minutes or fail on complex environments like this one.
+
+**For Option 1 (Conda - Slower):**
+- [Miniconda](https://docs.conda.io/en/latest/miniconda.html) or [Anaconda](https://www.anaconda.com/download)
+- If using conda, first enable the libmamba solver for faster resolution:
+  ```bash
+  conda install -n base -c conda-forge conda-libmamba-solver
+  conda config --set solver libmamba
+  ```
+
+**For Option 2 (Manual):**
+- [R](https://cran.r-project.org/) version 4.2 or higher
+- (Optional) [RStudio](https://posit.co/download/rstudio-desktop/)
+
+### Clone the Repository
+
 ```bash
-# Clone the repository
 git clone https://github.com/bminie/seurat-cli.git
 cd seurat-cli
+```
 
-# Install dependencies
+### Option 1: Mamba/Conda (Recommended)
+
+Create an isolated environment with all dependencies pre-configured:
+
+```bash
+# Using mamba (recommended - much faster)
+mamba env create -f environment.yml
+conda activate seurat-cli
+
+# Or using conda (slower, may take 30+ minutes)
+conda env create -f environment.yml
+conda activate seurat-cli
+
+# R-only environment (lighter, no workflow tools)
+mamba env create -f environment-r.yml   # or: conda env create -f environment-r.yml
+conda activate seurat-cli-r
+```
+
+### Option 2: Manual Installation
+
+If you prefer to use your existing R installation:
+
+```bash
+# Install R dependencies
 Rscript setup.R           # Core packages
 Rscript setup.R --all     # All packages including optional
+
+# For workflow pipelines, also install:
+pip install snakemake                      # Snakemake
+curl -s https://get.nextflow.io | bash     # Nextflow
 ```
 
 Or open in RStudio by double-clicking `seurat-cli.Rproj`.
@@ -345,6 +396,55 @@ Rscript scripts/04_differential_expression.R \
   --output ./de_pseudobulk
 ```
 
+## Workflow Pipelines
+
+For automated, reproducible analyses, use the included **Snakemake** or **Nextflow** pipelines.
+
+**Prerequisites:** Install [Snakemake](https://snakemake.readthedocs.io/) (`pip install snakemake`) or [Nextflow](https://www.nextflow.io/) (`curl -s https://get.nextflow.io | bash`).
+
+### Available Workflows
+
+| Workflow | Pipeline | Description |
+|----------|----------|-------------|
+| `basic` | 01 → 04 → 06 | Basic analysis with log normalization |
+| `sctransform` | 02 → 04 → 06 | SCTransform normalization |
+| `integration` | 03 → 04 → 06 | Multi-sample integration |
+| `cell_cycle` | 02 → 05 → 04 → 06 | SCTransform with cell cycle scoring |
+| `full` | 02 → 05 → 04 → 06 | Complete analysis with cell cycle |
+
+### Snakemake
+
+```bash
+cd workflows/snakemake
+
+# Edit config.yaml with your input paths and parameters
+# Then run:
+snakemake --configfile config.yaml --cores 4
+
+# Dry run to see what will execute
+snakemake --configfile config.yaml --cores 4 -n
+```
+
+### Nextflow
+
+```bash
+cd workflows/nextflow
+
+# Run with your data
+nextflow run main.nf --input /path/to/data --outdir results
+
+# Run with demo data
+nextflow run main.nf --demo --outdir demo_results
+
+# Run specific workflow
+nextflow run main.nf --input /path/to/data --workflow full
+
+# Run with Docker
+nextflow run main.nf --input /path/to/data -profile docker
+```
+
+See [workflows/README.md](workflows/README.md) for detailed documentation.
+
 ## Testing
 
 Verify your installation by running the demo tests:
@@ -359,10 +459,26 @@ Rscript tests/run_demo_tests.R
 # Test specific script
 Rscript tests/run_demo_tests.R --script 1
 
+# Validation options
+Rscript tests/run_demo_tests.R --skip_validation    # Skip output validation
+Rscript tests/run_demo_tests.R --validation_only    # Only validate existing output
+
 # Or using make
 make test-quick
 make test
+
+# Test workflow pipelines (requires Snakemake/Nextflow)
+./tests/test_pipelines.sh           # Test both
+./tests/test_pipelines.sh snakemake # Snakemake only
+./tests/test_pipelines.sh nextflow  # Nextflow only
 ```
+
+### Validation Framework
+
+The test runner includes a two-tier validation system:
+
+- **Tier 1 (Structural)**: Validates output files exist, CSV structure is correct, cluster assignments are valid integers, and Seurat objects load properly. Runs on all data.
+- **Tier 2 (Biological)**: Validates demo-specific expectations like expected cluster counts, cell counts, and known marker genes. Only runs on demo datasets.
 
 ## Installation Requirements
 
@@ -432,10 +548,20 @@ seurat-cli/
 │   ├── 04_differential_expression.R
 │   ├── 05_cell_cycle.R
 │   └── 06_visualization.R
+├── workflows/                  # Pipeline workflows
+│   ├── snakemake/             # Snakemake pipeline
+│   │   ├── Snakefile
+│   │   └── config.yaml
+│   ├── nextflow/              # Nextflow pipeline
+│   │   ├── main.nf
+│   │   └── nextflow.config
+│   └── README.md
 ├── utils/
 │   └── common.R               # Shared utility functions
 ├── tests/
-│   └── run_demo_tests.R       # Test runner
+│   ├── run_demo_tests.R       # R script test runner with validation
+│   ├── validate_outputs.R     # Two-tier validation framework
+│   └── test_pipelines.sh      # Pipeline test runner
 ├── config/                    # Configuration templates
 ├── output/                    # Default output directory
 ├── setup.R                    # Dependency installer
