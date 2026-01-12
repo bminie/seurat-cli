@@ -80,6 +80,70 @@ curl -s https://get.nextflow.io | bash     # Nextflow
 
 Or open in RStudio by double-clicking `seurat-cli.Rproj`.
 
+### Option 3: Docker
+
+Run without installing any dependencies:
+
+```bash
+# Build the image
+docker build -t seurat-cli .
+
+# Run with demo data
+docker run --rm -v $(pwd)/output:/output seurat-cli \
+  Rscript scripts/01_basic_analysis.R --demo --output /output
+
+# Run with your data
+docker run --rm -v /path/to/data:/data -v $(pwd)/output:/output seurat-cli \
+  Rscript scripts/01_basic_analysis.R --input /data --output /output
+
+# Interactive session
+docker run --rm -it -v $(pwd):/work seurat-cli bash
+
+# Get help for any script
+docker run --rm seurat-cli Rscript scripts/01_basic_analysis.R --help
+```
+
+**Run multiple scripts in sequence (pipeline):**
+```bash
+docker run --rm -v $(pwd)/output:/output seurat-cli bash -c "\
+  Rscript scripts/02_sctransform.R --demo --output /output/01_sct && \
+  Rscript scripts/04_differential_expression.R \
+    --input /output/01_sct/seurat_sctransform.rds \
+    --output /output/02_de && \
+  Rscript scripts/06_visualization.R \
+    --input /output/01_sct/seurat_sctransform.rds \
+    --marker_file /output/02_de/de_results_significant.csv \
+    --output /output/03_viz"
+```
+
+**Singularity (for HPC clusters):**
+```bash
+# Pull from Docker Hub (after image is published)
+singularity pull docker://bminie/seurat-cli:latest
+
+# Run a single script
+singularity exec seurat-cli_latest.sif \
+  Rscript /app/scripts/01_basic_analysis.R --demo --output ./output
+
+# Run with your data
+singularity exec --bind /path/to/data:/data,./output:/output seurat-cli_latest.sif \
+  Rscript /app/scripts/01_basic_analysis.R --input /data --output /output
+```
+
+**Use with workflow pipelines:**
+```bash
+# Nextflow with Docker
+cd workflows/nextflow
+nextflow run main.nf --demo -profile docker
+
+# Nextflow with Singularity (HPC)
+nextflow run main.nf --demo -profile singularity
+
+# Snakemake with Singularity
+cd workflows/snakemake
+snakemake --configfile config_demo.yaml --cores 4 --use-singularity
+```
+
 ## Quick Start
 
 ```bash
@@ -566,6 +630,8 @@ seurat-cli/
 │   └── test_pipelines.sh      # Pipeline test runner
 ├── config/                    # Configuration templates
 ├── output/                    # Default output directory
+├── Dockerfile                 # Docker image definition
+├── environment.yml            # Conda/mamba environment
 ├── setup.R                    # Dependency installer
 ├── Makefile                   # Common commands
 └── seurat-cli.Rproj           # RStudio project file

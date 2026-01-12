@@ -9,7 +9,17 @@
 #   snakemake --configfile config.yaml --cores 4 -n  # Dry run
 #   snakemake --configfile config.yaml --cores 4 --until differential_expression
 #
+# With Singularity container:
+#   snakemake --configfile config.yaml --cores 4 --use-singularity
+#
+# With Docker (via Singularity):
+#   snakemake --configfile config.yaml --cores 4 --use-singularity \
+#     --singularity-args "--docker"
+#
 # =============================================================================
+
+# Container image for all rules (used with --use-singularity)
+container: "docker://bminie/seurat-cli:latest"
 
 import os
 from pathlib import Path

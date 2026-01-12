@@ -8,11 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Docker support with Dockerfile for containerized execution
+  - Includes all dependencies, demo datasets, and scripts
+  - Compatible with Singularity for HPC clusters
 - Two-tier validation framework (`tests/validate_outputs.R`)
   - Tier 1: Structural validation (file existence, CSV structure, cluster assignments, Seurat object integrity)
   - Tier 2: Biological validation for demo datasets (expected cluster counts, cell counts, known markers)
 - New test runner options: `--skip_validation`, `--validation_only`
 - `cluster_assignments.csv` output for cell cycle script (05) for consistency with other scripts
+- GitHub Actions workflows for Nextflow and Snakemake CI
 
 ### Changed
 - `tests/run_demo_tests.R` now integrates the validation framework and reports detailed check counts

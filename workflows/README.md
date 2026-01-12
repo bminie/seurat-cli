@@ -157,8 +157,11 @@ nextflow run main.nf --input /path/to/data --workflow sctransform
 # Run with Docker
 nextflow run main.nf --demo -profile docker
 
-# Run on SLURM cluster
-nextflow run main.nf --input /path/to/data -profile slurm
+# Run with Singularity (HPC clusters)
+nextflow run main.nf --demo -profile singularity
+
+# Run on SLURM cluster with Singularity
+nextflow run main.nf --input /path/to/data -profile slurm,singularity
 
 # Run demo test
 nextflow run main.nf -profile test
@@ -227,6 +230,43 @@ results/
     └── dag.svg
 ```
 
+## Container Support
+
+Both pipelines support running in Docker or Singularity containers, which ensures reproducibility and simplifies dependency management.
+
+### Nextflow with Containers
+
+```bash
+# Docker (local development)
+nextflow run main.nf --demo -profile docker
+
+# Singularity (HPC clusters)
+nextflow run main.nf --demo -profile singularity
+
+# SLURM + Singularity
+nextflow run main.nf --input /path/to/data -profile slurm,singularity
+```
+
+### Snakemake with Containers
+
+```bash
+# With Singularity (recommended for HPC)
+snakemake --configfile config.yaml --cores 4 --use-singularity
+
+# Singularity will automatically pull the Docker image:
+# docker://bminie/seurat-cli:latest
+```
+
+### Building the Container Locally
+
+```bash
+# From the project root
+docker build -t seurat-cli .
+
+# Convert to Singularity (optional)
+singularity build seurat-cli.sif docker-daemon://seurat-cli:latest
+```
+
 ## Testing
 
 ```bash
@@ -238,4 +278,7 @@ snakemake --configfile config_demo.yaml --cores 2     # Actual run
 # Test Nextflow pipeline
 cd workflows/nextflow
 nextflow run main.nf -profile test
+
+# Test with containers
+nextflow run main.nf -profile test,docker
 ```

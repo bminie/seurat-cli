@@ -1,0 +1,40 @@
+# Git
+.git
+.gitignore
+
+# Test output
+test_output/
+output/
+
+# IDE
+.vscode/
+.idea/
+*.Rproj.user/
+
+# R artifacts
+.Rhistory
+.RData
+.Rproj.user
+
+# Documentation
+*.md
+!README.md
+LICENSE
+
+# Workflow outputs
+workflows/nextflow/work/
+workflows/nextflow/.nextflow/
+workflows/nextflow/.nextflow.log*
+workflows/snakemake/.snakemake/
+
+# Docker
+Dockerfile
+.dockerignore
+
+# Conda environments (not needed in Docker)
+environment*.yml
+
+# Misc
+*.log
+*.tmp
+.DS_Store
