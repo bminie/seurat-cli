@@ -27,7 +27,6 @@ name: seurat-cli
 channels:
   - conda-forge
   - bioconda
-  - defaults
 
 dependencies:
   # R and base packages
@@ -59,11 +58,15 @@ dependencies:
   - bioconductor-singlecellexperiment
 
   # Integration packages
+  # (bioconductor-batchelor is omitted: no osx-arm64 build on bioconda.
+  #  Install it with BiocManager if needed for FastMNN.)
   - r-harmony
-  - bioconductor-batchelor
 
   # Faster marker finding
-  - r-devtools  # For installing presto from GitHub
+  - r-presto
+
+  # For installing SeuratData from GitHub (via setup.R)
+  - r-remotes
 
   # Workflow managers
   - snakemake>=7.0
@@ -72,10 +75,9 @@ dependencies:
   # Java (required for Nextflow)
   - openjdk>=11
 
+  # Snakemake cluster executor (from bioconda rather than pip, so conda
+  # keeps its Python deps compatible with snakemake)
+  - snakemake-executor-plugin-cluster-generic
+
   # Utilities
   - graphviz  # For DAG visualization
-
-  # pip packages (if needed)
-  - pip
-  - pip:
-    - snakemake-executor-plugin-cluster-generic

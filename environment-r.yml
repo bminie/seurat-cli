@@ -26,7 +26,6 @@ name: seurat-cli-r
 channels:
   - conda-forge
   - bioconda
-  - defaults
 
 dependencies:
   # R and base packages
@@ -58,8 +57,12 @@ dependencies:
   - bioconductor-singlecellexperiment
 
   # Integration packages
+  # (bioconductor-batchelor is omitted: no osx-arm64 build on bioconda.
+  #  Install it with BiocManager if needed for FastMNN.)
   - r-harmony
-  - bioconductor-batchelor
 
   # Faster marker finding
-  - r-devtools  # For installing presto from GitHub
+  - r-presto
+
+  # For installing SeuratData from GitHub (via setup.R)
+  - r-remotes
