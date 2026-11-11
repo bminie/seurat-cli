@@ -204,17 +204,7 @@ log_message(sprintf("G2M phase genes: %d", length(g2m_genes)), log_env)
 if (args$demo) {
   log_message("Loading demo PBMC3K dataset from SeuratData...", log_env)
 
-  install_and_load(packages = "SeuratData", quiet = !args$verbose)
-
-  if (!"pbmc3k" %in% rownames(installed.packages())) {
-    InstallData("pbmc3k")
-  }
-  data("pbmc3k")
-  seurat_obj <- pbmc3k
-  rm(pbmc3k)
-
-  # Update to current Seurat version format (v5 compatibility)
-  seurat_obj <- UpdateSeuratObject(seurat_obj)
+  seurat_obj <- load_demo_dataset("pbmc3k")
   needs_preprocessing <- TRUE
 
 } else {
@@ -223,8 +213,10 @@ if (args$demo) {
   # Check if input is already a Seurat object
   if (grepl("\\.rds$", tolower(args$input))) {
     seurat_obj <- readRDS(args$input)
-    needs_preprocessing <- !("RNA" %in% Assays(seurat_obj) &&
-                             length(GetAssayData(seurat_obj, slot = "data")) > 0)
+    # Already-normalized objects (e.g. from scripts 01/02) skip preprocessing
+    has_data <- tryCatch(length(LayerData(seurat_obj, layer = "data")) > 0,
+                         error = function(e) FALSE)
+    needs_preprocessing <- !(DefaultAssay(seurat_obj) == "SCT" || has_data)
   } else {
     seurat_obj <- load_seurat_data(
       input_path = args$input,
@@ -259,6 +251,16 @@ if (needs_preprocessing) {
   seurat_obj <- NormalizeData(seurat_obj, verbose = args$verbose)
 
   # Variable features
+  seurat_obj <- FindVariableFeatures(seurat_obj,
+                                      nfeatures = args$n_variable_features,
+                                      verbose = args$verbose)
+}
+
+is_sct <- DefaultAssay(seurat_obj) == "SCT"
+if (is_sct) {
+  log_message("SCT assay detected - using SCTransform residuals for PCA and regression", log_env)
+} else if (length(VariableFeatures(seurat_obj)) == 0) {
+  log_message("No variable features found - running FindVariableFeatures", log_env)
   seurat_obj <- FindVariableFeatures(seurat_obj,
                                       nfeatures = args$n_variable_features,
                                       verbose = args$verbose)
@@ -328,8 +330,11 @@ write.csv(cc_scores, file.path(args$output, "cell_cycle_scores.csv"), row.names 
 
 log_message("Generating pre-regression visualizations...", log_env)
 
-# Scale and run PCA
-seurat_obj <- ScaleData(seurat_obj, verbose = args$verbose)
+# Scale and run PCA (SCT data is already scaled: its scale.data layer holds
+# the Pearson residuals, which ScaleData would overwrite)
+if (!is_sct) {
+  seurat_obj <- ScaleData(seurat_obj, verbose = args$verbose)
+}
 seurat_obj <- RunPCA(seurat_obj, features = VariableFeatures(seurat_obj),
                       npcs = args$n_pcs, verbose = args$verbose)
 
@@ -386,13 +391,26 @@ if (args$regress_cc || args$regress_cc_difference) {
     log_message(sprintf("  Also regressing: %s", paste(extra_vars, collapse = ", ")), log_env)
   }
 
-  # Re-scale with regression
-  seurat_obj <- ScaleData(
-    seurat_obj,
-    vars.to.regress = vars_to_regress,
-    features = rownames(seurat_obj),
-    verbose = args$verbose
-  )
+  if (is_sct) {
+    # For SCTransform data, regress by re-running SCTransform on the RNA counts
+    # (as in the Seurat cell cycle vignette) rather than with ScaleData
+    log_message("  Re-running SCTransform with these variables regressed", log_env)
+    seurat_obj <- SCTransform(
+      seurat_obj,
+      assay = "RNA",
+      new.assay.name = "SCT",
+      vars.to.regress = vars_to_regress,
+      verbose = args$verbose
+    )
+  } else {
+    # Re-scale with regression
+    seurat_obj <- ScaleData(
+      seurat_obj,
+      vars.to.regress = vars_to_regress,
+      features = rownames(seurat_obj),
+      verbose = args$verbose
+    )
+  }
 
   # Re-run PCA
   seurat_obj <- RunPCA(seurat_obj, features = VariableFeatures(seurat_obj),
