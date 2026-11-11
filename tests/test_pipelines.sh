@@ -633,7 +633,6 @@ test_nextflow_full() {
         --demo \
         --outdir '${NEXTFLOW_OUTPUT}/results' \
         --workflow sctransform \
-        --threads 2 \
         -with-report '${NEXTFLOW_OUTPUT}/report.html' \
         -with-timeline '${NEXTFLOW_OUTPUT}/timeline.html'"
 
