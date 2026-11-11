@@ -191,24 +191,7 @@ load_seurat_deps(quiet = !args$verbose)
 if (args$demo) {
   log_message("Loading demo PBMC3K dataset from SeuratData...", log_env)
 
-  install_and_load(packages = "SeuratData", quiet = !args$verbose)
-
-  # Install and load pbmc3k dataset
-  if (!"pbmc3k" %in% rownames(installed.packages())) {
-    InstallData("pbmc3k")
-  }
-  data("pbmc3k")
-  seurat_obj <- pbmc3k
-  rm(pbmc3k)
-
-  # If using raw data
-  if ("pbmc3k.final" %in% ls()) {
-    seurat_obj <- pbmc3k.final
-    rm(pbmc3k.final)
-  }
-
-  # Update to current Seurat version format (v5 compatibility)
-  seurat_obj <- UpdateSeuratObject(seurat_obj)
+  seurat_obj <- load_demo_dataset("pbmc3k")
 
 } else {
   log_message(sprintf("Loading data from: %s", args$input), log_env)
@@ -341,9 +324,10 @@ save_plot(p_pca1 + p_pca2, "04_pca.png", output_dir = args$output, width = 12, h
 p_elbow <- ElbowPlot(seurat_obj, ndims = min(args$n_pcs, 30))
 save_plot(p_elbow, "05_elbow_plot.png", output_dir = args$output, width = 8, height = 5)
 
-# PCA loadings heatmap
+# PCA loadings heatmap (fast = FALSE returns a ggplot; the default draws with
+# base graphics and returns NULL, which ggsave saves as a blank image)
 p_heatmap <- DimHeatmap(seurat_obj, dims = seq_len(min(9, length(dims_use))),
-                        cells = 500, balanced = TRUE)
+                        cells = 500, balanced = TRUE, fast = FALSE)
 save_plot(p_heatmap, "06_pca_heatmap.png", output_dir = args$output,
           width = 12, height = 12)
 
