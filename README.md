@@ -86,8 +86,8 @@ Or open in RStudio by double-clicking `seurat-cli.Rproj`.
 Run without installing any dependencies:
 
 ```bash
-# Build the image
-docker build -t seurat-cli .
+# Build the image (the second tag is the name the Nextflow docker profile uses)
+docker build -t seurat-cli -t bminie/seurat-cli:latest .
 
 # Run with demo data
 docker run --rm -v $(pwd)/output:/output seurat-cli \
@@ -132,6 +132,12 @@ singularity exec --bind /path/to/data:/data,./output:/output seurat-cli_latest.s
 ```
 
 **Use with workflow pipelines:**
+
+> The image is not on Docker Hub yet. Build it locally first (see above) so the
+> Nextflow `docker` profile can find `bminie/seurat-cli:latest`. The `singularity`
+> profile and Snakemake `--sdm apptainer` pull from Docker Hub, so they need the
+> image to be published.
+
 ```bash
 # Nextflow with Docker
 cd workflows/nextflow
@@ -611,7 +617,7 @@ BiocManager::install(c("batchelor", "scran", "scater"))
 ## Tips
 
 1. **Demo Mode**: Use `--demo` flag to test scripts with built-in datasets
-2. **Parallelization**: Use `--threads N` for multi-threaded operations
+2. **Parallelization**: Use `--threads N` for multi-threaded operations. Each extra thread runs a worker process with its own copy of the data, so memory use grows with N (SCTransform on pbmc3k: ~2 GB with 1 thread, ~5.8 GB with 2)
 3. **Reproducibility**: Results include `parameters.csv` and `session_info.txt`
 4. **Custom Features**: Most scripts accept `--features` for specific genes
 5. **Species**: Set `--species mouse` for mouse data (adjusts MT gene patterns)

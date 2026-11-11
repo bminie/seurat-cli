@@ -57,6 +57,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pseudobulk DE failed to match conditions containing `_` (AggregateExpression renames them with `-`) and could not group by `orig.ident` (AggregateExpression overwrites it); it now checks for at least 2 replicates per condition
 - `04_differential_expression.R` checks that `--condition_col`, `--pseudobulk_group`, and the condition values exist before running
 - Marker heatmaps in scripts 02, 03, 04, and 06 dropped genes without scaled values; missing genes are now scaled (or get SCT residuals) for plotting
+- Docker image could not install Seurat: it used R 4.3.2 but installed from current CRAN, where Matrix needs R >= 4.4. It now uses `rocker/r-ver:4.5.3` with the base image's date-pinned package snapshot, and the build fails if any required R package is missing (install failures only warned before)
+- Nextflow `docker` profile failed loading SeuratData: tasks run as the host user, who has no home in the image; the profile now sets `HOME=/tmp`
+- Nextflow `test` profile ran 2 threads in a 4 GB limit, which SCTransform exceeds (~5.8 GB) when the limit is enforced (e.g. in Docker); it now uses 1 thread (~2 GB)
 - Fixed clustering bug in `scripts/03_integration.R` where `FindNeighbors`/`FindClusters` used incorrect graph names, causing all cells to be assigned to a single cluster instead of the expected 15 clusters. The fix explicitly sets `graph.name` parameter to ensure consistent graph naming across Seurat v5.
 
 ## [1.0.0] - 2024-12-16

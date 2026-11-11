@@ -260,8 +260,9 @@ snakemake --configfile config.yaml --cores 4 --sdm apptainer
 ### Building the Container Locally
 
 ```bash
-# From the project root
-docker build -t seurat-cli .
+# From the project root. The Nextflow docker profile uses bminie/seurat-cli:latest,
+# which is not on Docker Hub yet, so build it under that name.
+docker build -t seurat-cli -t bminie/seurat-cli:latest .
 
 # Convert to Singularity (optional)
 singularity build seurat-cli.sif docker-daemon://seurat-cli:latest
