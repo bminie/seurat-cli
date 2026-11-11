@@ -231,12 +231,16 @@ Integrate multiple datasets using Seurat v5 methods.
 | `--sample_names` | auto | Sample names |
 | `--conditions` | NULL | Condition labels |
 | `--normalization` | `LogNormalize` | Normalization (LogNormalize, SCT) |
+| `--dims_use` | `1:30` | PCs used for integration, UMAP, and clustering |
+| `--reference` | NULL | Reference sample index, 1-based (CCA/RPCA only) |
+| `--k_anchor` | 5 | Neighbors used to pick anchors (CCA/RPCA only) |
+| `--resolutions` | NULL | Extra clustering resolutions (comma-separated); `--resolution` sets `seurat_clusters` |
 
 **Integration Methods:**
 - `CCAIntegration` - Canonical correlation analysis
 - `RPCAIntegration` - Reciprocal PCA (faster)
 - `HarmonyIntegration` - Harmony
-- `FastMNNIntegration` - Fast MNN
+- `FastMNNIntegration` - Fast MNN (needs [SeuratWrappers](https://github.com/satijalab/seurat-wrappers) and Bioconductor `batchelor`, which are not installed by default)
 
 **Example:**
 ```bash
@@ -352,6 +356,9 @@ Generate comprehensive visualizations.
 | `--group_by` | `seurat_clusters` | Grouping variable |
 | `--split_by` | NULL | Split variable |
 | `--reduction` | `umap` | Reduction for plots |
+| `--no_dim_plots`, `--no_feature_plots`, `--no_violin_plots`, `--no_dot_plot`, `--no_heatmap` | — | Skip a plot type (all on by default) |
+| `--ridge_plots`, `--scatter_plots` | FALSE | Add ridge / feature scatter plots |
+| `--no_label_clusters` | — | Don't label clusters on dim plots |
 
 **Example:**
 ```bash

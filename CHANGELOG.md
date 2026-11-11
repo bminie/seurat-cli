@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `cluster_assignments.csv` output for cell cycle script (05) for consistency with other scripts
 - GitHub Actions workflows for Nextflow and Snakemake CI
 - `--max_plot_features` option for `06_visualization.R` (default 36) to cap how many marker-file genes are plotted
+- `--no_dim_plots`, `--no_feature_plots`, `--no_violin_plots`, `--no_dot_plot`, `--no_heatmap`, and `--no_label_clusters` flags for `06_visualization.R` (these plots were on with no way to turn them off)
+- `load_demo_dataset()` helper in `utils/common.R`, used by every script's `--demo` mode
 
 ### Changed
 - `tests/run_demo_tests.R` now integrates the validation framework and reports detailed check counts
@@ -35,6 +37,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Nextflow `docker`/`singularity` profiles pointed at host script paths; they now use `/app/scripts` inside the image
 - `basic` workflow in both Snakemake and Nextflow expected `seurat_analyzed.rds`, but `01_basic_analysis.R` writes `seurat_object.rds`
 - Visualization step in pipelines plotted every significant DE gene (~300 PNGs, >200 MB for the demo)
+- `01_basic_analysis.R` saved a blank `06_pca_heatmap.png` (`DimHeatmap` drew with base graphics and returned nothing to save)
+- `03_integration.R` ignored `--reference`, `--k_anchor`, and `--dims_use` during integration; they are now passed to CCA/RPCA integration
+- `03_integration.R --normalization SCT` integrated as if the data were log-normalized; it now passes `normalization.method = "SCT"`
+- `03_integration.R --method FastMNNIntegration` failed with an unclear error; it now checks for SeuratWrappers and batchelor and says how to install them. Unknown methods and normalizations are rejected up front
+- `03_integration.R` errored when `--resolutions` did not include `--resolution`, and silently dropped `--conditions` when the count did not match the number of samples
+- Non-demo runs of `03_integration.R` required SeuratData (only needed for demo data)
+- Demo mode re-ran `InstallData()` on every run because it checked for a package named `pbmc3k` instead of `pbmc3k.SeuratData`
+- `05_cell_cycle.R` on SCTransform input overwrote the SCT residuals with `ScaleData` before PCA, and regressed cell cycle with `ScaleData`; it now keeps the residuals and regresses by re-running `SCTransform` with `vars.to.regress`
+- `05_cell_cycle.R` used the deprecated `GetAssayData(slot = )`
 - Fixed clustering bug in `scripts/03_integration.R` where `FindNeighbors`/`FindClusters` used incorrect graph names, causing all cells to be assigned to a single cluster instead of the expected 15 clusters. The fix explicitly sets `graph.name` parameter to ensure consistent graph naming across Seurat v5.
 
 ## [1.0.0] - 2024-12-16
