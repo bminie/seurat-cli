@@ -66,6 +66,10 @@ option_list <- list(
               help = "Minimum cells per feature [default: %default]"),
   make_option("--min_features", type = "integer", default = 200,
               help = "Minimum features per cell [default: %default]"),
+  make_option("--max_features", type = "integer", default = NULL,
+              help = "Maximum features per cell (default: no limit). Setting this or --max_mt filters cells before SCTransform"),
+  make_option("--max_mt", type = "double", default = NULL,
+              help = "Maximum percent mitochondrial (default: no limit). Setting this or --max_features filters cells before SCTransform"),
 
   # SCTransform Parameters
   make_option("--n_variable_features", type = "integer", default = 3000,
@@ -221,6 +225,20 @@ p_qc <- VlnPlot(seurat_obj,
                 ncol = 3, pt.size = 0.1)
 save_plot(p_qc, "01_qc_violin.png", output_dir = args$output, width = 12, height = 5)
 
+# Optional cell filtering. Off by default to match the SCTransform vignette,
+# which normalizes without filtering; set --max_features/--max_mt for real data.
+if (!is.null(args$max_features) || !is.null(args$max_mt)) {
+  max_features <- if (is.null(args$max_features)) Inf else args$max_features
+  max_mt <- if (is.null(args$max_mt)) Inf else args$max_mt
+  log_message(sprintf("Filtering cells: features %d-%s, MT < %s%%",
+                      args$min_features, format(max_features), format(max_mt)), log_env)
+  seurat_obj <- filter_cells(seurat_obj,
+                             min_features = args$min_features,
+                             max_features = max_features,
+                             max_mt = max_mt)
+  log_message(sprintf("After filtering: %d cells", ncol(seurat_obj)), log_env)
+}
+
 # -----------------------------------------------------------------------------
 # SCTransform Normalization
 # -----------------------------------------------------------------------------
@@ -339,7 +357,7 @@ if (args$find_markers) {
       pull(gene)
 
     if (length(top5) > 0) {
-      p_heatmap <- DoHeatmap(seurat_obj, features = unique(top5)) +
+      p_heatmap <- DoHeatmap(scale_for_heatmap(seurat_obj, top5), features = unique(top5)) +
         theme(text = element_text(size = 8))
       save_plot(p_heatmap, "07_marker_heatmap.png", output_dir = args$output,
                 width = 12, height = max(8, n_clusters * 0.8))
