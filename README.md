@@ -1,5 +1,6 @@
 # Seurat CLI
 
+[![Demo Tests](https://github.com/bminie/seurat-cli/actions/workflows/demo-tests.yml/badge.svg?branch=main)](https://github.com/bminie/seurat-cli/actions/workflows/demo-tests.yml)
 [![R Syntax Check](https://github.com/bminie/seurat-cli/actions/workflows/r-check.yml/badge.svg?branch=main)](https://github.com/bminie/seurat-cli/actions/workflows/r-check.yml)
 [![Nextflow](https://github.com/bminie/seurat-cli/actions/workflows/nextflow.yml/badge.svg?branch=main)](https://github.com/bminie/seurat-cli/actions/workflows/nextflow.yml)
 [![Snakemake](https://github.com/bminie/seurat-cli/actions/workflows/snakemake.yml/badge.svg?branch=main)](https://github.com/bminie/seurat-cli/actions/workflows/snakemake.yml)
@@ -552,7 +553,7 @@ make test
 
 The test runner includes a two-tier validation system:
 
-- **Tier 1 (Structural)**: Validates output files exist, CSV structure is correct, cluster assignments are valid integers, and Seurat objects load properly. Runs on all data.
+- **Tier 1 (Structural)**: Validates output files exist, CSV structure is correct, cluster assignments are valid integers, Seurat objects load properly, and every PNG figure has content (not a blank image). Runs on all data.
 - **Tier 2 (Biological)**: Validates demo-specific expectations like expected cluster counts, cell counts, and known marker genes. Only runs on demo datasets.
 
 ## Installation Requirements

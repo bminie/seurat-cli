@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--max_plot_features` option for `06_visualization.R` (default 36) to cap how many marker-file genes are plotted
 - `--no_dim_plots`, `--no_feature_plots`, `--no_violin_plots`, `--no_dot_plot`, `--no_heatmap`, and `--no_label_clusters` flags for `06_visualization.R` (these plots were on with no way to turn them off)
 - `load_demo_dataset()` helper in `utils/common.R`, used by every script's `--demo` mode
+- Demo Tests CI workflow (`.github/workflows/demo-tests.yml`): builds `environment-r.yml`, installs the demo datasets, and runs `tests/run_demo_tests.R` (the first CI job that runs the analyses)
+- Tier 1 validation checks that every PNG figure has content (catches blank images); adds `r-png` to the conda environments
+- Nextflow CI runs `nextflow lint` (strict syntax)
 
 ### Changed
 - `tests/run_demo_tests.R` now integrates the validation framework and reports detailed check counts
@@ -46,6 +49,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Demo mode re-ran `InstallData()` on every run because it checked for a package named `pbmc3k` instead of `pbmc3k.SeuratData`
 - `05_cell_cycle.R` on SCTransform input overwrote the SCT residuals with `ScaleData` before PCA, and regressed cell cycle with `ScaleData`; it now keeps the residuals and regresses by re-running `SCTransform` with `vars.to.regress`
 - `05_cell_cycle.R` used the deprecated `GetAssayData(slot = )`
+- Test runner misreported per-tier check counts (Tier 2 counted each check's fields, not checks)
+- CI `--help` check could never fail (a non-zero exit only raised a warning); it now fails the job
+- `make lint` printed failures but still exited successfully; it now exits non-zero and also checks `tests/*.R`
 - Fixed clustering bug in `scripts/03_integration.R` where `FindNeighbors`/`FindClusters` used incorrect graph names, causing all cells to be assigned to a single cluster instead of the expected 15 clusters. The fix explicitly sets `graph.name` parameter to ensure consistent graph naming across Seurat v5.
 
 ## [1.0.0] - 2024-12-16
