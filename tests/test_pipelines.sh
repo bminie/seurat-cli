@@ -533,11 +533,9 @@ de:
   test_use: "wilcox"
   logfc_threshold: 0.25
   min_pct: 0.1
-  extra_args: "--demo"
 
 visualization:
   reduction: "umap"
-  extra_args: "--demo"
 EOF
 
     echo "  Validating Snakemake configuration..."
@@ -561,10 +559,9 @@ EOF
 test_snakemake_full() {
     echo -e "${YELLOW}Snakemake Full Test...${NC}"
 
-    # Run dry run first if config doesn't exist
-    if [[ ! -f "${SNAKEMAKE_OUTPUT}/test_config.yaml" ]]; then
-        test_snakemake_dry_run || return 1
-    fi
+    # Always start clean: the dry run wipes old output and rewrites the test
+    # config, so a stale config or stale results can't make the test pass
+    test_snakemake_dry_run || return 1
 
     echo "  Running Snakemake pipeline (this may take several minutes)..."
 

@@ -1,11 +1,14 @@
 # =============================================================================
-# Demo Configuration - Uses built-in PBMC3K dataset
+# Demo Configuration - Uses built-in SeuratData datasets
 # =============================================================================
 #
-# This config runs a demo analysis using --demo flag
+# Only the entry-point step (01/02/03) loads demo data via --demo. Every later
+# step (cell cycle, DE, visualization) reads the previous step's output, so the
+# demo exercises the same chaining as a real run.
 #
 # Usage:
 #   snakemake --configfile config_demo.yaml --cores 4
+#   snakemake --configfile config_demo.yaml --cores 4 --config workflow=basic
 #
 # =============================================================================
 
@@ -13,11 +16,16 @@ workflow: "sctransform"
 scripts_dir: "../../scripts"
 output_dir: "demo_results"
 
-# Demo mode - uses built-in dataset
+# Demo mode - entry-point scripts ignore these and load built-in data
 input_path: "DEMO"
+input_list: "DEMO"
 
 species: "human"
 threads: 4
+
+# Entry points (pbmc3k for basic/sctransform, ifnb for integration)
+basic:
+  extra_args: "--demo"
 
 sctransform:
   n_variable_features: 3000
@@ -25,19 +33,20 @@ sctransform:
   dims_use: "1:30"
   extra_args: "--demo"
 
+integration:
+  extra_args: "--demo"
+
+# Downstream steps use the upstream outputs (no --demo)
 de:
   mode: "all_markers"
   test_use: "wilcox"
   logfc_threshold: 0.25
   min_pct: 0.1
-  extra_args: "--demo"
 
 cell_cycle:
   regress: false
   regress_difference: false
-  extra_args: "--demo"
 
 visualization:
   reduction: "umap"
   features: ""
-  extra_args: "--demo"

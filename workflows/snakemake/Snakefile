@@ -9,16 +9,12 @@
 #   snakemake --configfile config.yaml --cores 4 -n  # Dry run
 #   snakemake --configfile config.yaml --cores 4 --until differential_expression
 #
-# With Singularity container:
-#   snakemake --configfile config.yaml --cores 4 --use-singularity
-#
-# With Docker (via Singularity):
-#   snakemake --configfile config.yaml --cores 4 --use-singularity \
-#     --singularity-args "--docker"
+# With Apptainer/Singularity container (Snakemake >= 8):
+#   snakemake --configfile config.yaml --cores 4 --sdm apptainer
 #
 # =============================================================================
 
-# Container image for all rules (used with --use-singularity)
+# Container image for all rules (used with --sdm apptainer)
 container: "docker://bminie/seurat-cli:latest"
 
 import os
@@ -61,7 +57,7 @@ def get_entry_output():
     elif WORKFLOW in ["sctransform", "full"]:
         return os.path.join(OUTPUT_DIR, "01_sctransform", "seurat_sctransform.rds")
     else:
-        return os.path.join(OUTPUT_DIR, "01_basic", "seurat_analyzed.rds")
+        return os.path.join(OUTPUT_DIR, "01_basic", "seurat_object.rds")
 
 def get_final_target():
     """Get the final target based on workflow."""
@@ -78,7 +74,7 @@ rule all:
 # Allow running up to specific steps
 rule basic_analysis_only:
     input:
-        os.path.join(OUTPUT_DIR, "01_basic", "seurat_analyzed.rds")
+        os.path.join(OUTPUT_DIR, "01_basic", "seurat_object.rds")
 
 rule sctransform_only:
     input:
@@ -103,7 +99,7 @@ rule differential_expression_only:
 rule basic_analysis:
     """Run basic analysis (script 01) - entry point for 'basic' workflow."""
     output:
-        rds = os.path.join(OUTPUT_DIR, "01_basic", "seurat_analyzed.rds"),
+        rds = os.path.join(OUTPUT_DIR, "01_basic", "seurat_object.rds"),
         markers = os.path.join(OUTPUT_DIR, "01_basic", "cluster_markers_all.csv")
     params:
         script = get_script_path("01_basic_analysis.R"),
@@ -216,7 +212,7 @@ def get_cell_cycle_input(wildcards):
     elif WORKFLOW in ["sctransform", "full", "cell_cycle"]:
         return os.path.join(OUTPUT_DIR, "01_sctransform", "seurat_sctransform.rds")
     else:
-        return os.path.join(OUTPUT_DIR, "01_basic", "seurat_analyzed.rds")
+        return os.path.join(OUTPUT_DIR, "01_basic", "seurat_object.rds")
 
 rule cell_cycle:
     """Run cell cycle scoring (script 05)."""
@@ -258,7 +254,7 @@ def get_de_input(wildcards):
     elif WORKFLOW == "sctransform":
         return os.path.join(OUTPUT_DIR, "01_sctransform", "seurat_sctransform.rds")
     else:
-        return os.path.join(OUTPUT_DIR, "01_basic", "seurat_analyzed.rds")
+        return os.path.join(OUTPUT_DIR, "01_basic", "seurat_object.rds")
 
 rule differential_expression:
     """Run differential expression analysis (script 04)."""
@@ -305,7 +301,7 @@ def get_viz_input(wildcards):
     elif WORKFLOW == "sctransform":
         return os.path.join(OUTPUT_DIR, "01_sctransform", "seurat_sctransform.rds")
     else:
-        return os.path.join(OUTPUT_DIR, "01_basic", "seurat_analyzed.rds")
+        return os.path.join(OUTPUT_DIR, "01_basic", "seurat_object.rds")
 
 rule visualization:
     """Run visualization (script 06)."""
