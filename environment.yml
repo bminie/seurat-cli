@@ -69,8 +69,8 @@ dependencies:
   - r-remotes
 
   # Workflow managers
-  - snakemake>=7.0
-  - nextflow>=21.04
+  - snakemake>=8.0
+  - nextflow>=24.04
 
   # Java (required for Nextflow)
   - openjdk>=11

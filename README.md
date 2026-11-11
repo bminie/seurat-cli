@@ -139,9 +139,9 @@ nextflow run main.nf --demo -profile docker
 # Nextflow with Singularity (HPC)
 nextflow run main.nf --demo -profile singularity
 
-# Snakemake with Singularity
+# Snakemake with Apptainer/Singularity
 cd workflows/snakemake
-snakemake --configfile config_demo.yaml --cores 4 --use-singularity
+snakemake --configfile config_demo.yaml --cores 4 --sdm apptainer
 ```
 
 ## Quick Start
@@ -347,6 +347,8 @@ Generate comprehensive visualizations.
 | `--input` | required | Seurat RDS file |
 | `--features` | NULL | Genes to plot (comma-separated) |
 | `--marker_file` | NULL | CSV with marker genes |
+| `--top_markers` | 10 | Top markers per cluster taken from the marker file |
+| `--max_plot_features` | 36 | Cap on marker-file genes plotted (`--features` genes always kept; 0 = no limit) |
 | `--group_by` | `seurat_clusters` | Grouping variable |
 | `--split_by` | NULL | Split variable |
 | `--reduction` | `umap` | Reduction for plots |

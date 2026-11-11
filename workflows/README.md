@@ -250,8 +250,8 @@ nextflow run main.nf --input /path/to/data -profile slurm,singularity
 ### Snakemake with Containers
 
 ```bash
-# With Singularity (recommended for HPC)
-snakemake --configfile config.yaml --cores 4 --use-singularity
+# With Apptainer/Singularity (recommended for HPC; Snakemake >= 8)
+snakemake --configfile config.yaml --cores 4 --sdm apptainer
 
 # Singularity will automatically pull the Docker image:
 # docker://bminie/seurat-cli:latest

@@ -136,6 +136,9 @@ clean:
 	rm -rf test_output/
 	rm -rf output/
 	rm -rf results/
+	rm -rf workflows/nextflow/work/ workflows/nextflow/.nextflow/ workflows/nextflow/.nextflow.log*
+	rm -rf workflows/nextflow/demo_results/ workflows/nextflow/test_results/ workflows/nextflow/results/
+	rm -rf workflows/snakemake/.snakemake/ workflows/snakemake/demo_results/ workflows/snakemake/results/
 	rm -f *.log
 	rm -f .RData .Rhistory
 
