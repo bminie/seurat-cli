@@ -60,6 +60,9 @@ option_list <- list(
               help = "CSV file with marker genes (must have 'gene' column)"),
   make_option("--top_markers", type = "integer", default = 10,
               help = "Number of top markers per cluster to plot [default: %default]"),
+  make_option("--max_plot_features", type = "integer", default = 36,
+              help = paste("Maximum number of marker-file genes to plot (genes given",
+                           "with --features are always kept; 0 = no limit) [default: %default]")),
 
   # Group/identity options
   make_option("--group_by", type = "character", default = "seurat_clusters",
@@ -200,23 +203,51 @@ if (!is.null(args$split_by) && !args$split_by %in% colnames(seurat_obj@meta.data
 
 features_to_plot <- c()
 
-# From command line
+# From command line (always kept)
 if (!is.null(args$features)) {
   features_to_plot <- trimws(strsplit(args$features, ",")[[1]])
+  features_to_plot <- unique(features_to_plot[features_to_plot %in% rownames(seurat_obj)])
 }
 
 # From marker file
 if (!is.null(args$marker_file) && file.exists(args$marker_file)) {
   markers_df <- read.csv(args$marker_file)
   if ("gene" %in% colnames(markers_df)) {
+    # With per-cluster markers, keep the top N per cluster and interleave them
+    # (every cluster's best marker first, then every cluster's second, ...) so
+    # the cap below keeps markers from all clusters.
+    if ("cluster" %in% colnames(markers_df) && nrow(markers_df) > 0) {
+      if ("avg_log2FC" %in% colnames(markers_df)) {
+        markers_df <- markers_df |>
+          group_by(cluster) |>
+          slice_max(order_by = avg_log2FC, n = args$top_markers, with_ties = FALSE)
+      } else {
+        markers_df <- markers_df |>
+          group_by(cluster) |>
+          slice_head(n = args$top_markers)
+      }
+      markers_df <- markers_df |>
+        mutate(marker_rank = row_number()) |>
+        ungroup() |>
+        arrange(marker_rank, cluster)
+    }
+
     marker_genes <- unique(markers_df$gene)
+    marker_genes <- marker_genes[marker_genes %in% rownames(seurat_obj)]
+    marker_genes <- setdiff(marker_genes, features_to_plot)
+
+    if (args$max_plot_features > 0) {
+      n_keep <- max(0, args$max_plot_features - length(features_to_plot))
+      if (length(marker_genes) > n_keep) {
+        log_message(sprintf("Limiting marker genes to %d of %d (--max_plot_features %d)",
+                            n_keep, length(marker_genes), args$max_plot_features), log_env)
+        marker_genes <- head(marker_genes, n_keep)
+      }
+    }
+
     features_to_plot <- c(features_to_plot, marker_genes)
   }
 }
-
-# Filter to genes in dataset
-features_to_plot <- unique(features_to_plot)
-features_to_plot <- features_to_plot[features_to_plot %in% rownames(seurat_obj)]
 
 log_message(sprintf("Features to plot: %d", length(features_to_plot)), log_env)
 
