@@ -294,6 +294,44 @@ save_plot <- function(plot,
   return(output_path)
 }
 
+#' Add scaled values for features so DoHeatmap can plot them
+#'
+#' DoHeatmap only plots features in the scale.data layer, which usually holds
+#' just the variable features, so top markers outside that set are dropped.
+#' Returns a copy for plotting with the missing features added: SCT residuals
+#' for SCT assays, otherwise ScaleData on only the missing features (existing
+#' scaled values, including any regression, are kept).
+#'
+#' @param seurat_obj Seurat object
+#' @param features Features to be plotted
+#' @return Seurat object (use for plotting only)
+scale_for_heatmap <- function(seurat_obj, features) {
+  assay <- DefaultAssay(seurat_obj)
+  features <- intersect(unique(features), rownames(seurat_obj[[assay]]))
+  scaled <- tryCatch(
+    rownames(LayerData(seurat_obj, assay = assay, layer = "scale.data")),
+    error = function(e) character())
+  missing <- setdiff(features, scaled)
+
+  if (length(missing) == 0) {
+    return(seurat_obj)
+  }
+
+  if (inherits(seurat_obj[[assay]], "SCTAssay")) {
+    seurat_obj <- GetResidual(seurat_obj, features = missing, assay = assay, verbose = FALSE)
+  } else if (length(scaled) == 0) {
+    seurat_obj <- ScaleData(seurat_obj, features = missing, assay = assay, verbose = FALSE)
+  } else {
+    extra <- ScaleData(seurat_obj, features = missing, assay = assay, verbose = FALSE)
+    combined <- rbind(LayerData(seurat_obj, assay = assay, layer = "scale.data"),
+                      LayerData(extra, assay = assay, layer = "scale.data"))
+    seurat_obj <- SetAssayData(seurat_obj, assay = assay, layer = "scale.data",
+                               new.data = combined)
+  }
+
+  seurat_obj
+}
+
 #' Create timestamped output directory
 #'
 #' @param base_dir Base directory

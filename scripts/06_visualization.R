@@ -460,7 +460,7 @@ if (args$heatmap && length(features_to_plot) > 0) {
   # Heatmap features
   heatmap_features <- head(features_to_plot, 50)
 
-  p_heat <- DoHeatmap(seurat_obj,
+  p_heat <- DoHeatmap(scale_for_heatmap(seurat_obj, heatmap_features),
                        features = heatmap_features,
                        group.by = args$group_by,
                        size = 3) +
@@ -482,7 +482,7 @@ if (args$heatmap && length(features_to_plot) > 0) {
       top_by_cluster <- top_by_cluster[top_by_cluster %in% rownames(seurat_obj)]
 
       if (length(top_by_cluster) > 0) {
-        p_heat_markers <- DoHeatmap(seurat_obj,
+        p_heat_markers <- DoHeatmap(scale_for_heatmap(seurat_obj, top_by_cluster),
                                      features = top_by_cluster,
                                      group.by = args$group_by,
                                      size = 3) +

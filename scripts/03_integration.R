@@ -554,7 +554,7 @@ if (args$find_markers) {
       pull(gene)
 
     if (length(top5) > 0) {
-      p_heatmap <- DoHeatmap(seurat_obj, features = unique(top5)) +
+      p_heatmap <- DoHeatmap(scale_for_heatmap(seurat_obj, top5), features = unique(top5)) +
         theme(text = element_text(size = 8))
       save_plot(p_heatmap, "07_marker_heatmap.png", output_dir = args$output,
                 width = 12, height = max(8, n_clusters * 0.8))
