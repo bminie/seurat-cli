@@ -71,16 +71,27 @@ option_list <- list(
               help = "Metadata column for splitting plots"),
 
   # Plot types to generate
+  # Plots that are on by default each have a --no_* flag to turn them off
   make_option("--dim_plots", action = "store_true", default = TRUE,
-              help = "Generate dimensional reduction plots"),
+              help = "Generate dimensional reduction plots [default: TRUE]"),
+  make_option("--no_dim_plots", action = "store_false", dest = "dim_plots",
+              help = "Skip dimensional reduction plots"),
   make_option("--feature_plots", action = "store_true", default = TRUE,
-              help = "Generate feature plots"),
+              help = "Generate feature plots [default: TRUE]"),
+  make_option("--no_feature_plots", action = "store_false", dest = "feature_plots",
+              help = "Skip feature plots"),
   make_option("--violin_plots", action = "store_true", default = TRUE,
-              help = "Generate violin plots"),
+              help = "Generate violin plots [default: TRUE]"),
+  make_option("--no_violin_plots", action = "store_false", dest = "violin_plots",
+              help = "Skip violin plots"),
   make_option("--dot_plot", action = "store_true", default = TRUE,
-              help = "Generate dot plots"),
+              help = "Generate dot plots [default: TRUE]"),
+  make_option("--no_dot_plot", action = "store_false", dest = "dot_plot",
+              help = "Skip dot plots"),
   make_option("--heatmap", action = "store_true", default = TRUE,
-              help = "Generate heatmaps"),
+              help = "Generate heatmaps [default: TRUE]"),
+  make_option("--no_heatmap", action = "store_false", dest = "heatmap",
+              help = "Skip heatmaps"),
   make_option("--ridge_plots", action = "store_true", default = FALSE,
               help = "Generate ridge plots"),
   make_option("--scatter_plots", action = "store_true", default = FALSE,
@@ -94,7 +105,9 @@ option_list <- list(
   make_option("--pt_size", type = "double", default = 0.5,
               help = "Point size for scatter plots [default: %default]"),
   make_option("--label_clusters", action = "store_true", default = TRUE,
-              help = "Label clusters on dim plots"),
+              help = "Label clusters on dim plots [default: TRUE]"),
+  make_option("--no_label_clusters", action = "store_false", dest = "label_clusters",
+              help = "Don't label clusters on dim plots"),
   make_option("--ncol", type = "integer", default = 3,
               help = "Number of columns for multi-panel plots [default: %default]"),
   make_option("--width", type = "double", default = 10,
@@ -153,17 +166,7 @@ library(viridis)
 if (args$demo) {
   log_message("Loading demo PBMC3K dataset from SeuratData...", log_env)
 
-  install_and_load(packages = "SeuratData", quiet = !args$verbose)
-
-  if (!"pbmc3k" %in% rownames(installed.packages())) {
-    InstallData("pbmc3k")
-  }
-  data("pbmc3k")
-  seurat_obj <- pbmc3k
-  rm(pbmc3k)
-
-  # Update to current Seurat version format (v5 compatibility)
-  seurat_obj <- UpdateSeuratObject(seurat_obj)
+  seurat_obj <- load_demo_dataset("pbmc3k")
 
   # Run basic preprocessing for demo
   log_message("Running basic preprocessing for demo data...", log_env)
