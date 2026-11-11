@@ -177,10 +177,10 @@ for (i in seq_along(tests)) {
       validation_summary <- summarize_validation(validation_results)
 
       # Print validation details
-      cat(sprintf("  Tier 1 (structural): %d checks\n",
-                  length(unlist(validation_results$tier1, recursive = FALSE))))
-      cat(sprintf("  Tier 2 (biological): %d checks\n",
-                  length(unlist(validation_results$tier2, recursive = FALSE))))
+      cat(sprintf("  Tier 1 (structural): %d/%d checks passed\n",
+                  validation_summary$tier1_passed, validation_summary$tier1_total))
+      cat(sprintf("  Tier 2 (biological): %d/%d checks passed\n",
+                  validation_summary$tier2_passed, validation_summary$tier2_total))
 
       if (validation_summary$all_passed) {
         cat(sprintf("\n✓ PASSED - %d/%d validation checks (%ss)\n\n",

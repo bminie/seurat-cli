@@ -47,6 +47,7 @@ dependencies:
   - r-viridis
   - r-hdf5r
   - r-r.utils
+  - r-png  # Used by tests/validate_outputs.R to check figures are not blank
 
   # SCTransform dependencies
   - r-sctransform

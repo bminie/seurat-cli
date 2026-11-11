@@ -246,6 +246,41 @@ validate_markers <- function(output_dir) {
   results
 }
 
+#' Validate that PNG figures are not blank
+#'
+#' Reads each PNG as packed integer pixels and checks that a random sample of
+#' pixels holds more than one colour. A blank image (e.g. a plot drawn with
+#' base graphics and then saved with ggsave) is a single colour.
+#' @param output_dir Output directory containing PNG files
+#' @param n_sample Number of pixels to sample per image
+validate_figures <- function(output_dir, n_sample = 20000) {
+  results <- list()
+  png_files <- list.files(output_dir, pattern = "\\.png$", full.names = TRUE)
+
+  if (length(png_files) == 0) {
+    return(results)
+  }
+
+  if (!requireNamespace("png", quietly = TRUE)) {
+    results[["png_package"]] <- validation_result(
+      FALSE, "Figure content check (png package)",
+      "Install the 'png' R package to check figures for content")
+    return(results)
+  }
+
+  for (f in png_files) {
+    name <- basename(f)
+    results[[name]] <- safe_check({
+      pixels <- png::readPNG(f, native = TRUE)
+      sampled <- pixels[sample.int(length(pixels), min(n_sample, length(pixels)))]
+      n_colours <- length(unique(sampled))
+      if (n_colours > 1) TRUE else sprintf("Image is a single colour (%d px sampled)", length(sampled))
+    }, sprintf("Figure has content: %s", name))
+  }
+
+  results
+}
+
 #' Validate Seurat object structure
 #' @param rds_path Path to Seurat RDS file
 #' @param expected_reductions Character vector of expected reduction names
@@ -564,7 +599,10 @@ run_tier1_validation <- function(output_dir, script_name) {
     results[["markers"]] <- validate_markers(output_dir)
   }
 
-  # 4. Seurat object validation
+  # 4. Figures are not blank
+  results[["figures"]] <- validate_figures(output_dir)
+
+  # 5. Seurat object validation
   if (script_name %in% names(rds_files)) {
     rds_info <- rds_files[[script_name]]
     rds_path <- file.path(output_dir, rds_info$file)
@@ -600,32 +638,35 @@ run_validation <- function(output_dir, script_name, is_demo = FALSE) {
   results
 }
 
+#' Flatten nested validation results into a named list of individual checks
+#' @param x Nested list of validation results (e.g. results$tier1)
+#' @param prefix Name prefix for the flattened entries
+flatten_results <- function(x, prefix = "") {
+  flat <- list()
+  for (name in names(x)) {
+    item <- x[[name]]
+    full_name <- if (prefix == "") name else paste(prefix, name, sep = ".")
+
+    if (is.list(item) && !is.null(item$passed)) {
+      # This is a validation result
+      flat[[full_name]] <- item
+    } else if (is.list(item)) {
+      # Recurse
+      flat <- c(flat, flatten_results(item, full_name))
+    }
+  }
+  flat
+}
+
 #' Summarize validation results
 #' @param results Validation results from run_validation()
-#' @return List with summary statistics
+#' @return List with summary statistics (overall and per tier)
 summarize_validation <- function(results) {
-  # Flatten nested results
-  flatten_results <- function(x, prefix = "") {
-    flat <- list()
-    for (name in names(x)) {
-      item <- x[[name]]
-      full_name <- if (prefix == "") name else paste(prefix, name, sep = ".")
+  tier1 <- flatten_results(results$tier1, "tier1")
+  tier2 <- flatten_results(results$tier2, "tier2")
+  all_results <- c(tier1, tier2)
 
-      if (is.list(item) && !is.null(item$passed)) {
-        # This is a validation result
-        flat[[full_name]] <- item
-      } else if (is.list(item)) {
-        # Recurse
-        flat <- c(flat, flatten_results(item, full_name))
-      }
-    }
-    flat
-  }
-
-  all_results <- c(
-    flatten_results(results$tier1, "tier1"),
-    flatten_results(results$tier2, "tier2")
-  )
+  count_passed <- function(checks) sum(vapply(checks, function(x) isTRUE(x$passed), logical(1)))
 
   passed <- sum(sapply(all_results, function(x) x$passed))
   failed <- sum(sapply(all_results, function(x) !x$passed))
@@ -640,7 +681,11 @@ summarize_validation <- function(results) {
     passed = passed,
     failed = failed,
     all_passed = failed == 0,
-    failed_checks = failed_details
+    failed_checks = failed_details,
+    tier1_total = length(tier1),
+    tier1_passed = count_passed(tier1),
+    tier2_total = length(tier2),
+    tier2_passed = count_passed(tier2)
   )
 }
 
