@@ -146,6 +146,20 @@ if (!args$demo && !file.exists(args$input)) {
   stop(sprintf("Input file not found: %s", args$input))
 }
 
+valid_modes <- c("all_markers", "between_clusters", "between_conditions", "custom")
+if (!args$mode %in% valid_modes) {
+  stop(sprintf("Unknown --mode '%s'. Choose one of: %s", args$mode, paste(valid_modes, collapse = ", ")))
+}
+
+if (args$pseudobulk) {
+  if (args$mode != "between_conditions") {
+    stop("--pseudobulk only applies to --mode between_conditions")
+  }
+  if (is.null(args$pseudobulk_group)) {
+    stop("--pseudobulk needs --pseudobulk_group (the metadata column with sample/replicate IDs)")
+  }
+}
+
 set.seed(args$seed)
 
 # -----------------------------------------------------------------------------
@@ -313,6 +327,21 @@ if (args$mode == "all_markers") {
     stop("--condition_col and --condition_1 required for between_conditions mode")
   }
 
+  meta_cols <- colnames(seurat_obj@meta.data)
+  for (col in c(args$condition_col, args$pseudobulk_group)) {
+    if (!col %in% meta_cols) {
+      stop(sprintf("Metadata column '%s' not found. Available: %s",
+                   col, paste(meta_cols, collapse = ", ")))
+    }
+  }
+  condition_values <- unique(as.character(seurat_obj@meta.data[[args$condition_col]]))
+  for (cond in c(args$condition_1, args$condition_2)) {
+    if (!cond %in% condition_values) {
+      stop(sprintf("Condition '%s' not found in '%s'. Values: %s",
+                   cond, args$condition_col, paste(condition_values, collapse = ", ")))
+    }
+  }
+
   # Subset if needed
   obj_subset <- seurat_obj
   if (!is.null(args$subset_cluster)) {
@@ -327,24 +356,47 @@ if (args$mode == "all_markers") {
                       args$condition_1,
                       ifelse(is.null(args$condition_2), "all others", args$condition_2)), log_env)
 
-  if (args$pseudobulk && !is.null(args$pseudobulk_group)) {
+  if (args$pseudobulk) {
     # Pseudobulk DE analysis
     log_message("Running pseudobulk analysis...", log_env)
+
+    # Group by copies of the columns: AggregateExpression overwrites
+    # orig.ident in its output (and scripts 01-03 store sample names there)
+    obj_subset$pb_condition <- as.character(obj_subset@meta.data[[args$condition_col]])
+    obj_subset$pb_sample <- as.character(obj_subset@meta.data[[args$pseudobulk_group]])
 
     # Create pseudobulk counts
     bulk <- AggregateExpression(
       obj_subset,
-      group.by = c(args$condition_col, args$pseudobulk_group),
+      group.by = c("pb_condition", "pb_sample"),
       return.seurat = TRUE,
       verbose = args$verbose
     )
 
-    Idents(bulk) <- args$condition_col
+    Idents(bulk) <- "pb_condition"
+
+    # AggregateExpression replaces "_" with "-" in group names
+    to_bulk_name <- function(x) if (is.null(x)) NULL else gsub("_", "-", x)
+    ident_1 <- to_bulk_name(args$condition_1)
+    ident_2 <- to_bulk_name(args$condition_2)
+
+    # DESeq2 needs replicates: at least 2 pseudobulk samples per condition
+    n_per_condition <- table(Idents(bulk))
+    log_message(sprintf("Pseudobulk samples per condition: %s",
+                        paste(names(n_per_condition), n_per_condition, sep = "=", collapse = ", ")),
+                log_env)
+    compared <- if (is.null(ident_2)) names(n_per_condition) else c(ident_1, ident_2)
+    too_few <- compared[n_per_condition[compared] < 2]
+    if (length(too_few) > 0) {
+      stop(sprintf(paste("Pseudobulk DE needs at least 2 samples per condition in '%s'.",
+                         "Too few for: %s. Check that --pseudobulk_group identifies replicates."),
+                   args$pseudobulk_group, paste(too_few, collapse = ", ")))
+    }
 
     de_results <- FindMarkers(
       bulk,
-      ident.1 = args$condition_1,
-      ident.2 = args$condition_2,
+      ident.1 = ident_1,
+      ident.2 = ident_2,
       test.use = "DESeq2",
       verbose = args$verbose
     )
@@ -497,7 +549,7 @@ if (args$mode == "all_markers" && nrow(sig_results) > 0) {
     unique()
 
   if (length(top_genes) > 0) {
-    p_heatmap <- DoHeatmap(seurat_obj, features = top_genes) +
+    p_heatmap <- DoHeatmap(scale_for_heatmap(seurat_obj, top_genes), features = top_genes) +
       theme(text = element_text(size = 8))
     save_plot(p_heatmap, "heatmap_top_markers.png", output_dir = args$output,
               width = 12, height = max(8, length(top_genes) * 0.25))
