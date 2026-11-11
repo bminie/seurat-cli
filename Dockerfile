@@ -21,7 +21,10 @@
 #
 # =============================================================================
 
-FROM rocker/r-ver:4.3.2
+# R 4.5.3 matches the conda environments. rocker pins R packages to a dated
+# Posit Package Manager snapshot for this R version, so the installs below use
+# the image's default repos (no repos= override) to stay compatible with R.
+FROM rocker/r-ver:4.5.3
 
 LABEL maintainer="bminie"
 LABEL description="Seurat CLI - Command-line tools for single-cell RNA-seq analysis"
@@ -61,7 +64,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Install core R packages from CRAN
+# Install packages in parallel
+RUN echo 'options(Ncpus = max(1L, parallel::detectCores()))' >> "${R_HOME}/etc/Rprofile.site"
+
+# Install core R packages (CRAN snapshot from the base image)
 RUN R -e "install.packages(c( \
     'remotes', \
     'BiocManager', \
@@ -73,29 +79,46 @@ RUN R -e "install.packages(c( \
     'future', \
     'viridis', \
     'hdf5r', \
-    'R.utils' \
-), repos='https://cloud.r-project.org/', Ncpus=4)"
+    'R.utils', \
+    'png' \
+))"
 
 # Install Seurat and sctransform
-RUN R -e "install.packages(c('Seurat', 'sctransform'), repos='https://cloud.r-project.org/', Ncpus=4)"
+RUN R -e "install.packages(c('Seurat', 'sctransform'))"
 
 # Install glmGamPoi for faster SCTransform v2
 RUN R -e "BiocManager::install('glmGamPoi', ask=FALSE, update=FALSE)"
 
 # Install SeuratData and demo datasets
-RUN R -e "remotes::install_github('satijalab/seurat-data', quiet=TRUE)" \
+RUN R -e "remotes::install_github('satijalab/seurat-data', quiet=TRUE, upgrade='never')" \
     && R -e "SeuratData::InstallData('pbmc3k')" \
     && R -e "SeuratData::InstallData('ifnb')"
 
 # Install presto for fast marker detection
-RUN R -e "remotes::install_github('immunogenomics/presto', quiet=TRUE)"
+RUN R -e "remotes::install_github('immunogenomics/presto', quiet=TRUE, upgrade='never')"
 
 # Install Bioconductor packages for DE analysis
 RUN R -e "BiocManager::install(c('MAST', 'DESeq2', 'SingleCellExperiment'), ask=FALSE, update=FALSE)"
 
 # Install optional integration packages
-RUN R -e "install.packages('harmony', repos='https://cloud.r-project.org/')" \
+RUN R -e "install.packages('harmony')" \
     && R -e "BiocManager::install(c('batchelor', 'scran', 'scater'), ask=FALSE, update=FALSE)"
+
+# Fail the build if any package is missing. install.packages() only warns when
+# a package fails to install, so without this check the image could build
+# without Seurat.
+RUN Rscript -e " \
+    pkgs <- c('optparse', 'dplyr', 'ggplot2', 'patchwork', 'Matrix', 'future', \
+              'viridis', 'hdf5r', 'png', 'Seurat', 'SeuratObject', 'sctransform', \
+              'glmGamPoi', 'SeuratData', 'pbmc3k.SeuratData', 'ifnb.SeuratData', \
+              'presto', 'MAST', 'DESeq2', 'SingleCellExperiment', 'harmony', \
+              'batchelor', 'scran', 'scater'); \
+    missing <- pkgs[!vapply(pkgs, requireNamespace, logical(1), quietly = TRUE)]; \
+    if (length(missing) > 0) { \
+      message('Missing R packages: ', paste(missing, collapse = ', ')); quit(status = 1) \
+    }; \
+    cat('All', length(pkgs), 'R packages available. Seurat', \
+        as.character(packageVersion('Seurat')), '\n')"
 
 # Create working directory
 WORKDIR /app
