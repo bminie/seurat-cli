@@ -100,20 +100,25 @@ jobs:
     - name: Verify --help works for all scripts
       run: |
         scripts <- list.files("scripts", pattern = "\\.R$", full.names = TRUE)
-        
+        failed <- character()
+
         for (script in scripts) {
-          message(paste("\nTesting:", script))
-          
-          # Source the common utilities first
-          result <- tryCatch({
-            # Just check that optparse can parse the arguments
-            cmd <- paste("Rscript", script, "--help")
-            system(cmd, intern = TRUE)
-            message(paste("  ✓ --help works"))
-            TRUE
-          }, error = function(e) {
-            message(paste("  ✗ Error:", e$message))
-            FALSE
-          })
+          # system2 records a non-zero exit as a "status" attribute (with a
+          # warning) rather than an error, so check the status explicitly
+          out <- suppressWarnings(
+            system2("Rscript", c(script, "--help"), stdout = TRUE, stderr = TRUE))
+          status <- attr(out, "status")
+
+          if (is.null(status) || status == 0) {
+            message("✓ ", script)
+          } else {
+            message("✗ ", script, " (exit ", status, ")")
+            message(paste(out, collapse = "\n"))
+            failed <- c(failed, script)
+          }
+        }
+
+        if (length(failed) > 0) {
+          stop("--help failed for: ", paste(failed, collapse = ", "))
         }
       shell: Rscript {0}

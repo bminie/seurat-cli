@@ -20,6 +20,11 @@ jobs:
       - name: Check Nextflow version
         run: nextflow -version
 
+      - name: Lint pipeline (strict syntax)
+        run: |
+          cd workflows/nextflow
+          nextflow lint main.nf nextflow.config
+
       - name: Validate pipeline syntax
         run: |
           cd workflows/nextflow

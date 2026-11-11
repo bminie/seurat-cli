@@ -126,10 +126,13 @@ check-deps:
 # Linting
 lint:
 	@echo "Checking R syntax..."
-	@for f in scripts/*.R utils/*.R; do \
-		echo "Checking $$f..."; \
-		Rscript -e "parse('$$f')" > /dev/null 2>&1 && echo "  ✓ OK" || echo "  ✗ FAILED"; \
-	done
+	@fail=0; for f in scripts/*.R utils/*.R tests/*.R; do \
+		if Rscript -e "invisible(parse('$$f'))" > /dev/null 2>&1; then \
+			echo "  ✓ $$f"; \
+		else \
+			echo "  ✗ $$f"; Rscript -e "parse('$$f')" 2>&1 | head -3; fail=1; \
+		fi; \
+	done; exit $$fail
 
 # Cleanup
 clean:
