@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Demo Tests CI workflow (`.github/workflows/demo-tests.yml`): builds `environment-r.yml`, installs the demo datasets, and runs `tests/run_demo_tests.R` (the first CI job that runs the analyses)
 - Tier 1 validation checks that every PNG figure has content (catches blank images); adds `r-png` to the conda environments
 - Nextflow CI runs `nextflow lint` (strict syntax)
+- `--max_features` and `--max_mt` options for `02_sctransform.R` to filter cells before SCTransform (off by default, matching the SCTransform vignette)
 
 ### Changed
 - `tests/run_demo_tests.R` now integrates the validation framework and reports detailed check counts
@@ -52,6 +53,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Test runner misreported per-tier check counts (Tier 2 counted each check's fields, not checks)
 - CI `--help` check could never fail (a non-zero exit only raised a warning); it now fails the job
 - `make lint` printed failures but still exited successfully; it now exits non-zero and also checks `tests/*.R`
+- `04_differential_expression.R --pseudobulk` without `--pseudobulk_group` silently ran standard DE; it now stops with a clear message, as does `--pseudobulk` outside `between_conditions` mode
+- Pseudobulk DE failed to match conditions containing `_` (AggregateExpression renames them with `-`) and could not group by `orig.ident` (AggregateExpression overwrites it); it now checks for at least 2 replicates per condition
+- `04_differential_expression.R` checks that `--condition_col`, `--pseudobulk_group`, and the condition values exist before running
+- Marker heatmaps in scripts 02, 03, 04, and 06 dropped genes without scaled values; missing genes are now scaled (or get SCT residuals) for plotting
 - Fixed clustering bug in `scripts/03_integration.R` where `FindNeighbors`/`FindClusters` used incorrect graph names, causing all cells to be assigned to a single cluster instead of the expected 15 clusters. The fix explicitly sets `graph.name` parameter to ensure consistent graph naming across Seurat v5.
 
 ## [1.0.0] - 2024-12-16

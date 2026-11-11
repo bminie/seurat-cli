@@ -206,6 +206,8 @@ Improved normalization using regularized negative binomial regression.
 | `--n_variable_features` | 3000 | Variable features |
 | `--vars_to_regress` | NULL | Variables to regress (comma-separated) |
 | `--vst_flavor` | `v2` | SCTransform version (v1, v2) |
+| `--max_features` | none | Max features per cell; filters cells before SCTransform when set |
+| `--max_mt` | none | Max % mitochondrial; filters cells before SCTransform when set |
 | `--dims_use` | `1:30` | PCs for downstream |
 
 **Example:**
@@ -276,7 +278,8 @@ Flexible DE testing with multiple frameworks.
 | `--test_use` | `wilcox` | Statistical test |
 | `--min_pct` | 0.1 | Min fraction expressing |
 | `--logfc_threshold` | 0.25 | Log FC threshold |
-| `--pseudobulk` | FALSE | Use pseudobulk DE |
+| `--pseudobulk` | FALSE | Pseudobulk DESeq2 (`between_conditions` mode only) |
+| `--pseudobulk_group` | NULL | Sample/replicate column; required with `--pseudobulk`, needs at least 2 samples per condition |
 
 **Modes:**
 - `all_markers` - Find markers for all clusters
