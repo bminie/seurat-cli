@@ -191,17 +191,7 @@ if (args$vst_flavor == "v2") {
 if (args$demo) {
   log_message("Loading demo PBMC dataset...", log_env)
 
-  install_and_load(packages = "SeuratData", quiet = !args$verbose)
-
-  if (!"pbmc3k" %in% rownames(installed.packages())) {
-    InstallData("pbmc3k")
-  }
-  data("pbmc3k")
-  seurat_obj <- pbmc3k
-  rm(pbmc3k)
-
-  # Update to current Seurat version format (v5 compatibility)
-  seurat_obj <- UpdateSeuratObject(seurat_obj)
+  seurat_obj <- load_demo_dataset("pbmc3k")
 
 } else {
   log_message(sprintf("Loading data from: %s", args$input), log_env)

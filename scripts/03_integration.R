@@ -91,9 +91,9 @@ option_list <- list(
   make_option("--method", type = "character", default = "CCAIntegration",
               help = "Integration method: CCAIntegration, RPCAIntegration, HarmonyIntegration, FastMNNIntegration [default: %default]"),
   make_option("--reference", type = "integer", default = NULL,
-              help = "Index of reference sample (1-based) for RPCA. NULL = no reference"),
+              help = "Index of reference sample (1-based) for CCA/RPCA. NULL = no reference"),
   make_option("--k_anchor", type = "integer", default = 5,
-              help = "Number of anchors for integration [default: %default]"),
+              help = "Number of neighbors used to pick anchors (CCA/RPCA) [default: %default]"),
 
   # Dimensional Reduction
   make_option("--n_pcs", type = "integer", default = 50,
@@ -147,6 +147,16 @@ if (!args$demo && is.null(args$input_list)) {
   stop("Error: --input_list is required (or use --demo)")
 }
 
+valid_methods <- c("CCAIntegration", "RPCAIntegration", "HarmonyIntegration", "FastMNNIntegration")
+if (!args$method %in% valid_methods) {
+  stop(sprintf("Unknown --method '%s'. Choose one of: %s",
+               args$method, paste(valid_methods, collapse = ", ")))
+}
+
+if (!args$normalization %in% c("LogNormalize", "SCT")) {
+  stop(sprintf("Unknown --normalization '%s'. Choose LogNormalize or SCT", args$normalization))
+}
+
 # Parse dims
 parse_dims <- function(dims_str) {
   if (grepl(":", dims_str)) {
@@ -158,10 +168,11 @@ parse_dims <- function(dims_str) {
 }
 dims_use <- parse_dims(args$dims_use)
 
-# Parse resolutions
+# Parse resolutions (the primary --resolution is always included, since it
+# sets the final seurat_clusters)
 resolutions <- args$resolution
 if (!is.null(args$resolutions)) {
-  resolutions <- as.numeric(strsplit(args$resolutions, ",")[[1]])
+  resolutions <- unique(c(args$resolution, as.numeric(strsplit(args$resolutions, ",")[[1]])))
 }
 
 set.seed(args$seed)
@@ -192,11 +203,23 @@ if (args$threads > 1) {
 # -----------------------------------------------------------------------------
 
 log_message("Loading required packages...", log_env)
-load_seurat_deps(include_integration = TRUE, quiet = !args$verbose)
+load_seurat_deps(quiet = !args$verbose)
 
 # Load additional packages for specific methods
 if (args$method == "HarmonyIntegration") {
   install_and_load(packages = "harmony", quiet = !args$verbose)
+}
+if (args$method == "FastMNNIntegration") {
+  # FastMNNIntegration lives in SeuratWrappers (GitHub) and needs batchelor
+  missing_pkgs <- c("SeuratWrappers", "batchelor")[
+    !vapply(c("SeuratWrappers", "batchelor"), requireNamespace, logical(1), quietly = TRUE)]
+  if (length(missing_pkgs) > 0) {
+    stop(sprintf(paste0("FastMNNIntegration needs: %s. Install with ",
+                        "remotes::install_github('satijalab/seurat-wrappers') and ",
+                        "BiocManager::install('batchelor')"),
+                 paste(missing_pkgs, collapse = ", ")))
+  }
+  suppressPackageStartupMessages(library(SeuratWrappers))
 }
 
 # -----------------------------------------------------------------------------
@@ -206,19 +229,8 @@ if (args$method == "HarmonyIntegration") {
 if (args$demo) {
   log_message("Loading demo ifnb dataset (stimulated vs control PBMCs)...", log_env)
 
-  install_and_load(packages = "SeuratData", quiet = !args$verbose)
-
-  if (!"ifnb" %in% rownames(installed.packages())) {
-    InstallData("ifnb")
-  }
-  data("ifnb")
-
   # The ifnb dataset is already a merged object with 'stim' metadata
-  seurat_obj <- ifnb
-  rm(ifnb)
-
-  # Update to current Seurat version format (v5 compatibility)
-  seurat_obj <- UpdateSeuratObject(seurat_obj)
+  seurat_obj <- load_demo_dataset("ifnb")
 
   # For demo, split by condition
   seurat_list <- SplitObject(seurat_obj, split.by = "stim")
@@ -269,11 +281,19 @@ if (args$demo) {
 # Add conditions if provided
 if (!is.null(args$conditions)) {
   conditions <- trimws(strsplit(args$conditions, ",")[[1]])
-  if (length(conditions) == length(seurat_list)) {
-    for (i in seq_along(seurat_list)) {
-      seurat_list[[i]]$condition <- conditions[i]
-    }
+  if (length(conditions) != length(seurat_list)) {
+    stop(sprintf("--conditions has %d values but there are %d samples",
+                 length(conditions), length(seurat_list)))
   }
+  for (i in seq_along(seurat_list)) {
+    seurat_list[[i]]$condition <- conditions[i]
+  }
+}
+
+# Validate reference sample index now that the number of samples is known
+if (!is.null(args$reference) &&
+    (args$reference < 1 || args$reference > length(seurat_list))) {
+  stop(sprintf("--reference must be between 1 and %d", length(seurat_list)))
 }
 
 log_message(sprintf("Loaded %d samples", length(seurat_list)), log_env)
@@ -370,17 +390,42 @@ save_plot(p_pre_integration, "02_umap_before_integration.png",
 
 log_message(sprintf("Running integration (%s)...", args$method), log_env)
 
-# Seurat v5 integration
-seurat_obj <- IntegrateLayers(
-  object = seurat_obj,
-  method = get(args$method),
-  orig.reduction = "pca",
-  new.reduction = "integrated",
-  verbose = args$verbose
-)
+# Seurat v5 integration. Anchor-based methods (CCA/RPCA) also take the
+# normalization method, dims, k.anchor, and an optional reference sample.
+# IntegrateLayers is called directly (not via do.call): Seurat's SCT
+# integration checks fail when the call is built with do.call.
+if (args$method %in% c("CCAIntegration", "RPCAIntegration")) {
+  if (!is.null(args$reference)) {
+    log_message(sprintf("  Reference sample: %s", names(seurat_list)[args$reference]), log_env)
+  }
+  seurat_obj <- IntegrateLayers(
+    object = seurat_obj,
+    method = get(args$method),
+    orig.reduction = "pca",
+    new.reduction = "integrated",
+    normalization.method = args$normalization,
+    dims = dims_use,
+    k.anchor = args$k_anchor,
+    reference = args$reference,
+    verbose = args$verbose
+  )
+} else {
+  if (!is.null(args$reference)) {
+    log_message(sprintf("WARNING: --reference is only used by CCA/RPCA integration; ignoring for %s",
+                        args$method), log_env)
+  }
+  seurat_obj <- IntegrateLayers(
+    object = seurat_obj,
+    method = get(args$method),
+    orig.reduction = "pca",
+    new.reduction = "integrated",
+    verbose = args$verbose
+  )
+}
 
-# Re-join layers after integration
-seurat_obj <- JoinLayers(seurat_obj)
+# Re-join the RNA layers after integration (the SCT assay, when used, is
+# not split into layers)
+seurat_obj[["RNA"]] <- JoinLayers(seurat_obj[["RNA"]])
 
 log_message("Integration complete", log_env)
 

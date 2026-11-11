@@ -193,17 +193,7 @@ if (args$test_use == "DESeq2" || args$pseudobulk) {
 if (args$demo) {
   log_message("Loading demo PBMC3K dataset from SeuratData...", log_env)
 
-  install_and_load(packages = "SeuratData", quiet = !args$verbose)
-
-  if (!"pbmc3k" %in% rownames(installed.packages())) {
-    InstallData("pbmc3k")
-  }
-  data("pbmc3k")
-  seurat_obj <- pbmc3k
-  rm(pbmc3k)
-
-  # Update to current Seurat version format (v5 compatibility)
-  seurat_obj <- UpdateSeuratObject(seurat_obj)
+  seurat_obj <- load_demo_dataset("pbmc3k")
 
   # Run basic preprocessing for demo
   log_message("Running basic preprocessing for demo data...", log_env)

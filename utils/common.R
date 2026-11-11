@@ -46,24 +46,37 @@ install_and_load <- function(packages = NULL, bioc_packages = NULL, quiet = FALS
 
 #' Load core Seurat dependencies
 #'
-#' @param include_spatial Logical, include spatial analysis packages
-#' @param include_integration Logical, include integration packages
+#' SeuratData is only needed for demo mode, so it is loaded by
+#' load_demo_dataset() rather than here.
+#'
 #' @param quiet Logical, suppress messages
-load_seurat_deps <- function(include_spatial = FALSE,
-                              include_integration = FALSE,
-                              quiet = FALSE) {
-
+load_seurat_deps <- function(quiet = FALSE) {
   core_packages <- c("Seurat", "dplyr", "ggplot2", "patchwork")
-
-  if (include_spatial) {
-    core_packages <- c(core_packages, "SeuratData")
-  }
-
-  if (include_integration) {
-    core_packages <- c(core_packages, "SeuratData")
-  }
-
   install_and_load(packages = core_packages, quiet = quiet)
+}
+
+#' Load a SeuratData demo dataset, updated to the current Seurat object format
+#'
+#' Installs the dataset on first use. SeuratData itself is on GitHub, not
+#' CRAN, so it must already be installed (setup.R does this).
+#'
+#' @param dataset Dataset name, e.g. "pbmc3k" or "ifnb"
+#' @return Seurat object
+load_demo_dataset <- function(dataset) {
+  if (!requireNamespace("SeuratData", quietly = TRUE)) {
+    stop("Demo mode needs the SeuratData package (GitHub only). ",
+         "Install it with: Rscript setup.R")
+  }
+  suppressPackageStartupMessages(library(SeuratData))
+
+  if (!requireNamespace(paste0(dataset, ".SeuratData"), quietly = TRUE)) {
+    message(sprintf("Installing demo dataset: %s", dataset))
+    SeuratData::InstallData(dataset)
+  }
+
+  data_env <- new.env()
+  utils::data(list = dataset, envir = data_env)
+  UpdateSeuratObject(data_env[[dataset]])
 }
 
 # -----------------------------------------------------------------------------
