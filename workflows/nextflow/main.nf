@@ -128,18 +128,6 @@ def helpMessage() {
     """.stripIndent()
 }
 
-if (params.help) {
-    helpMessage()
-    exit 0
-}
-
-// Validate inputs
-if (!params.demo && !params.input && !params.input_list) {
-    helpMessage()
-    log.error "Error: --input or --input_list is required (or use --demo)"
-    exit 1
-}
-
 // -----------------------------------------------------------------------------
 // Processes
 // -----------------------------------------------------------------------------
@@ -152,7 +140,7 @@ process BASIC_ANALYSIS {
     path input_data
 
     output:
-    path "seurat_analyzed.rds", emit: rds
+    path "seurat_object.rds", emit: rds
     path "cluster_markers_all.csv", emit: markers
     path "*.csv"
     path "*.png"
@@ -409,13 +397,25 @@ workflow FULL_WORKFLOW {
 // -----------------------------------------------------------------------------
 
 workflow {
+    if (params.help) {
+        helpMessage()
+        exit 0
+    }
+
+    // Validate inputs
+    if (!params.demo && !params.input && !params.input_list) {
+        helpMessage()
+        log.error "Error: --input or --input_list is required (or use --demo)"
+        exit 1
+    }
+
     // Create input channel
     if (params.demo) {
-        input_ch = Channel.of(file("${projectDir}/dummy_input"))
+        input_ch = channel.of(file("${projectDir}/dummy_input"))
     } else if (params.workflow == "integration") {
-        input_ch = Channel.fromPath(params.input_list)
+        input_ch = channel.fromPath(params.input_list)
     } else {
-        input_ch = Channel.fromPath(params.input)
+        input_ch = channel.fromPath(params.input)
     }
 
     // Run selected workflow
