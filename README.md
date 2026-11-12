@@ -89,6 +89,10 @@ Run without installing any dependencies:
 # Build the image (the second tag is the name the Nextflow docker profile uses)
 docker build -t seurat-cli -t bminie/seurat-cli:latest .
 
+# On Apple Silicon, build an amd64 image for x86-64 Linux/HPC machines instead.
+# Takes ~15 min: Bioconductor packages compile from source under emulation.
+docker buildx build --platform linux/amd64 --load -t seurat-cli:amd64 .
+
 # Run with demo data
 docker run --rm -v $(pwd)/output:/output seurat-cli \
   Rscript scripts/01_basic_analysis.R --demo --output /output
