@@ -16,6 +16,10 @@ These scripts provide command-line interfaces to common Seurat workflows, allowi
 - Automate batch processing
 - Generate reproducible results with logged parameters
 
+The scripts require **Seurat 6.0 or newer**. Besides the classic vignettes they
+cover the Seurat 6 additions: sample-level analysis with scSLIDE
+(`07_sample_level.R`) and 10x Xenium/Atera imaging data (`08_spatial.R`).
+
 ## Installation
 
 ### Prerequisites
@@ -63,7 +67,20 @@ conda activate seurat-cli
 # R-only environment (lighter, no workflow tools)
 mamba env create -f environment-r.yml   # or: conda env create -f environment-r.yml
 conda activate seurat-cli-r
+
+# Then, in the activated environment: Seurat 6, the demo datasets, and the
+# packages conda can't provide
+Rscript setup.R
 ```
+
+> **Seurat 6 and conda:** conda-forge can lag behind CRAN; at the time of
+> writing it still has Seurat 5.5. `setup.R` runs `install_seurat.R`, which
+> builds the current Seurat from CRAN on top of the environment (about a
+> minute; the environment includes the compilers and dependencies). Run it on
+> its own with `Rscript install_seurat.R` (or `make install-seurat`), or check
+> the installed version with `Rscript install_seurat.R --check`. If you later
+> update `r-seurat` with conda, run it again. Once conda-forge has Seurat 6 it
+> has nothing to do.
 
 ### Option 2: Manual Installation
 
@@ -188,6 +205,8 @@ Standard scRNA-seq workflow including QC, normalization, clustering, and marker 
 | `--n_variable_features` | 2000 | Variable features |
 | `--dims_use` | `1:10` | PCs for clustering |
 | `--resolution` | 0.5 | Clustering resolution |
+| `--umap_init` | `spectral` | UMAP initialization (`spectral`, `pca`, `spca`, `random`, ...) |
+| `--threads` | 1 | Threads for Seurat's multithreaded steps |
 | `--demo` | FALSE | Use demo dataset |
 
 **Example:**
@@ -219,6 +238,8 @@ Improved normalization using regularized negative binomial regression.
 | `--max_features` | none | Max features per cell; filters cells before SCTransform when set |
 | `--max_mt` | none | Max % mitochondrial; filters cells before SCTransform when set |
 | `--dims_use` | `1:30` | PCs for downstream |
+| `--umap_init` | `spectral` | UMAP initialization |
+| `--threads` | 1 | Threads for Seurat's multithreaded steps |
 
 **Example:**
 ```bash
@@ -247,6 +268,8 @@ Integrate multiple datasets using Seurat v5 methods.
 | `--dims_use` | `1:30` | PCs used for integration, UMAP, and clustering |
 | `--reference` | NULL | Reference sample index, 1-based (CCA/RPCA only) |
 | `--k_anchor` | 5 | Neighbors used to pick anchors (CCA/RPCA only) |
+| `--svd_method` | `auto` | SVD backend for CCA: `irlba`, or `rspectra`, which avoids building the cell-by-cell matrix (`auto` picks `rspectra` for large inputs) |
+| `--umap_init` | `spectral` | UMAP initialization |
 | `--resolutions` | NULL | Extra clustering resolutions (comma-separated); `--resolution` sets `seurat_clusters` |
 
 **Integration Methods:**
@@ -290,6 +313,11 @@ Flexible DE testing with multiple frameworks.
 | `--logfc_threshold` | 0.25 | Log FC threshold |
 | `--pseudobulk` | FALSE | Pseudobulk DESeq2 (`between_conditions` mode only) |
 | `--pseudobulk_group` | NULL | Sample/replicate column; required with `--pseudobulk`, needs at least 2 samples per condition |
+
+With `--pseudobulk`, the script also draws `pseudobulk_heatmap.png`: the top up-
+and down-regulated genes across the pseudobulk samples, ordered and annotated by
+condition (Seurat 6 `PlotAnnotatedHeatmap`; needs Bioconductor `ComplexHeatmap`,
+which `setup.R` installs).
 
 **Modes:**
 - `all_markers` - Find markers for all clusters
@@ -337,6 +365,8 @@ Cell cycle scoring and regression.
 | `--regress_cc` | FALSE | Regress out cell cycle |
 | `--regress_cc_difference` | FALSE | Regress difference only |
 | `--gene_set_version` | `2019` | Gene set version |
+| `--umap_init` | `spectral` | UMAP initialization |
+| `--threads` | 1 | Threads for Seurat's multithreaded steps |
 
 **Example:**
 ```bash
@@ -388,6 +418,102 @@ Rscript scripts/06_visualization.R \
   --marker_file ./de_results/cluster_markers_top10.csv \
   --split_by "condition" \
   --output ./figures_split
+```
+
+---
+
+### 7. Sample-Level Analysis (`07_sample_level.R`)
+
+Seurat 6's [scSLIDE](https://satijalab.org/seurat/articles/scSLIDE_vignette)
+workflow for studies with many samples (e.g. donors): each sample is summarized
+by how its cells spread over a set of landmark cells, a diffusion map orders the
+samples along the main axes of variation, and pseudobulk trajectory DE finds the
+genes that change along each axis, per cell type.
+
+Steps: `PrepareSampleObject` (balanced sketch, landmarks, response-oriented PLS
+embedding, cell-to-landmark neighbors) → `GenerateSampleObject` → `RunDiffusionMap`
+→ `TrajDETest` → `PlotAnnotatedHeatmap`. Instead of the vignette's cloud Azimuth
+annotation (which uploads the data), the cell-type embedding is an existing
+reduction, such as the `integrated` reduction from `03_integration.R`.
+
+**Key Parameters:**
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--input` | required | Seurat RDS with normalized data from several samples |
+| `--sample_col` | required | Metadata column with sample IDs |
+| `--response` | required | Sample-level variable the PLS embedding should capture (e.g. disease) |
+| `--celltype_col` | NULL | Cell types: grouping for gene selection, landmark names, DE per cell type |
+| `--reduction` / `--dims` | `pca` / `1:30` | Cell-type embedding combined with PLS |
+| `--modality` | `multi` | `multi` (WNN of reduction + PLS) or `single` (PLS only) |
+| `--pls_method` | `cppls` | `cppls`, `plsr`, or `spls` |
+| `--ncells_per_sample` / `--ncells_landmark` | 1000 / 2000 | Training cells per sample / landmark cells |
+| `--traj_dcs` | `1` | Diffusion components to test for DE |
+| `--de_celltypes` | `all` | Cell types for trajectory DE |
+| `--latent_vars` | NULL | Sample-level covariates (log library size is always included) |
+| `--min_samples` | 6 | Minimum pseudobulk samples per cell type |
+
+The script needs at least 4 samples; with fewer than ~10, only the first one or
+two diffusion components carry information (the rest are skipped). The demo uses
+ifnb with donor IDs from Seurat's DE tutorial (8 donors × 2 conditions = 16
+samples; the ~5 MB donor files are downloaded once and cached).
+
+**Outputs:** `sample_embedding.csv` (samples with their diffusion components),
+`traj_de_<celltype>_DC<k>.csv`, `traj_de_summary.csv`, `sample_object.rds`,
+diffusion map and heatmap figures.
+
+**Example:**
+```bash
+Rscript scripts/07_sample_level.R \
+  --input ./integrated/seurat_integrated.rds \
+  --sample_col donor --response disease --celltype_col cell_type \
+  --reduction integrated --latent_vars age,sex \
+  --output ./sample_level
+
+# Demo
+Rscript scripts/07_sample_level.R --demo --output ./demo_sample_level
+```
+
+---
+
+### 8. Imaging Spatial Data (`08_spatial.R`)
+
+10x Genomics **Xenium** and **Atera** output folders, following the Xenium part
+of Seurat's [spatial vignette](https://satijalab.org/seurat/articles/spatial_vignette_2)
+and the [Atera tutorial](https://satijalab.org/seurat/articles/atera_tutorial):
+QC, SCTransform, clustering, markers, clusters and genes on the tissue, transcript
+positions, and an optional zoomed view with cell outlines. Atera's Azimuth cell
+type annotations are plotted when present. The platform is detected from the folder.
+
+**Key Parameters:**
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--input` | required | Xenium or Atera output folder |
+| `--platform` | `auto` | `auto`, `xenium`, or `atera` |
+| `--molecules` | NULL | Genes whose transcript positions to load and plot (only these are read) |
+| `--segmentations` | `auto` | Outlines to load: `cell`, `nucleus`, `none` (auto: cell for Xenium, none for Atera) |
+| `--crop` | NULL | Zoomed view `xmin,xmax,ymin,ymax` in microns (see `cell_coordinates.csv`) |
+| `--normalization` | `SCT` | `SCT` or `LogNormalize` |
+| `--resolution` | 0.3 | Clustering resolution |
+| `--features` | top markers | Genes to plot on the tissue |
+| `--min_counts` | 1 | Minimum transcripts per cell |
+| `--bpcells_dir` | NULL | Atera: keep counts on disk with BPCells |
+
+Reading Parquet transcripts (newer Xenium outputs) needs `arrow`; reading Atera
+needs `blosc`, `jsonlite` and `data.table`; `--crop` needs `sf`. `setup.R --all` and the conda
+environments install them. On the 10x Xenium mouse brain "tiny subset" (36,602
+cells, 248 genes) the script runs in about a minute and peaks at ~6 GB.
+
+There is no demo dataset (the smallest public Xenium example is a 3.5 GB
+download); the test suite runs the script on a small synthetic Xenium folder
+written by `tests/make_xenium_fixture.R`.
+
+**Example:**
+```bash
+Rscript scripts/08_spatial.R \
+  --input ./Xenium_V1_FF_Mouse_Brain_Coronal_Subset_CTX_HP_outs \
+  --molecules Gad1,Sst,Pvalb,Gfap \
+  --crop 2000,2600,1000,1500 \
+  --threads 4 --output ./xenium_results
 ```
 
 ---
@@ -542,10 +668,10 @@ Verify your installation by running the demo tests:
 # Quick test (scripts 1-2 only, ~5 min)
 Rscript tests/run_demo_tests.R --quick
 
-# Full test suite (~15-30 min)
+# Full test suite (scripts 1-8, ~5 min)
 Rscript tests/run_demo_tests.R
 
-# Test specific script
+# Test specific script (1-8; script 8 runs on a generated synthetic Xenium folder)
 Rscript tests/run_demo_tests.R --script 1
 
 # Validation options
@@ -586,13 +712,15 @@ Rscript setup.R --all      # Everything including optional integration packages
 | **Core** | Seurat, dplyr, ggplot2, patchwork, optparse, Matrix, future, viridis | Required for all scripts |
 | **Recommended** | SeuratData, presto, hdf5r, sctransform, glmGamPoi | Demo data, faster markers, HDF5 support, SCTransform v2 |
 | **Bioconductor DE** | MAST, DESeq2, SingleCellExperiment | Alternative DE methods |
+| **Seurat 6 features** | ComplexHeatmap, destiny | Annotated heatmaps (04, 07), diffusion maps (07) |
 | **Optional** | harmony, batchelor, scran, scater | Integration methods |
+| **Optional (`--all`)** | arrow, blosc, jsonlite, data.table, sf, spls | Xenium Parquet / Atera zarr reading and zoomed views (08), sparse PLS (07) |
 
 ### Demo Datasets
 
 The setup script also installs demo datasets:
 - **pbmc3k** (~8MB) - Used by scripts 01, 02, 04, 05, 06
-- **ifnb** (~400MB) - Used by script 03 (integration)
+- **ifnb** (~400MB) - Used by scripts 03 (integration) and 07 (sample-level; plus ~5 MB of donor IDs downloaded on first use and cached in the user cache directory, or `$SEURAT_CLI_CACHE`)
 
 ### Manual Installation
 
@@ -621,7 +749,7 @@ BiocManager::install(c("batchelor", "scran", "scater"))
 ## Tips
 
 1. **Demo Mode**: Use `--demo` flag to test scripts with built-in datasets
-2. **Parallelization**: Use `--threads N` for multi-threaded operations. Each extra thread runs a worker process with its own copy of the data, so memory use grows with N (SCTransform on pbmc3k: ~2 GB with 1 thread, ~5.8 GB with 2)
+2. **Parallelization**: Use `--threads N` to run Seurat's multithreaded steps (normalization, scaling, SCTransform, PCA, neighbors, clustering, UMAP, CCA/RPCA integration) on N threads. The threads share one copy of the data, so memory use barely changes with N. Gains depend on dataset size: integration of ifnb (14k cells) runs ~16% faster with 4 threads; pbmc3k is too small to benefit much
 3. **Reproducibility**: Results include `parameters.csv` and `session_info.txt`
 4. **Custom Features**: Most scripts accept `--features` for specific genes
 5. **Species**: Set `--species mouse` for mouse data (adjusts MT gene patterns)
@@ -636,7 +764,9 @@ seurat-cli/
 │   ├── 03_integration.R
 │   ├── 04_differential_expression.R
 │   ├── 05_cell_cycle.R
-│   └── 06_visualization.R
+│   ├── 06_visualization.R
+│   ├── 07_sample_level.R       # scSLIDE (Seurat 6)
+│   └── 08_spatial.R            # Xenium / Atera (Seurat 6)
 ├── workflows/                  # Pipeline workflows
 │   ├── snakemake/             # Snakemake pipeline
 │   │   ├── Snakefile
@@ -650,12 +780,14 @@ seurat-cli/
 ├── tests/
 │   ├── run_demo_tests.R       # R script test runner with validation
 │   ├── validate_outputs.R     # Two-tier validation framework
+│   ├── make_xenium_fixture.R  # Synthetic Xenium data for testing 08
 │   └── test_pipelines.sh      # Pipeline test runner
 ├── config/                    # Configuration templates
 ├── output/                    # Default output directory
 ├── Dockerfile                 # Docker image definition
 ├── environment.yml            # Conda/mamba environment
 ├── setup.R                    # Dependency installer
+├── install_seurat.R           # Installs Seurat 6 from CRAN when conda's is older
 ├── Makefile                   # Common commands
 └── seurat-cli.Rproj           # RStudio project file
 ```
@@ -686,8 +818,8 @@ While these scripts faithfully implement the Seurat vignettes, they include seve
 ### Execution Flexibility
 
 - **Dual execution support**: Scripts work both via `Rscript` command line and `source()` in RStudio
-- **Demo mode**: All scripts support `--demo` flag for testing with built-in datasets
-- **Multi-threading**: Scripts support `--threads` parameter for parallel execution
+- **Demo mode**: Scripts 01-07 support `--demo` for testing with built-in datasets (script 08 has no small public dataset; the tests generate a synthetic one)
+- **Multi-threading**: `--threads` sets Seurat's native multithreading (`setThreads()`, Seurat >= 5.6), so threads share one copy of the data
 
 ## References
 

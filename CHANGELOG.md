@@ -24,6 +24,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tier 1 validation checks that every PNG figure has content (catches blank images); adds `r-png` to the conda environments
 - Nextflow CI runs `nextflow lint` (strict syntax)
 - `--max_features` and `--max_mt` options for `02_sctransform.R` to filter cells before SCTransform (off by default, matching the SCTransform vignette)
+- Seurat 6 support:
+  - `07_sample_level.R`: sample-level analysis with scSLIDE (landmark density per sample, diffusion map trajectories, pseudobulk trajectory DE per cell type, annotated heatmaps). Demo uses ifnb with donor IDs (16 samples)
+  - `08_spatial.R`: 10x Xenium and Atera imaging data (QC, clustering, markers, spatial plots, transcript positions for selected genes, zoomed view with cell outlines, Atera Azimuth annotations)
+  - `install_seurat.R` (and `make install-seurat`): installs the required Seurat from CRAN when the installed one (e.g. conda-forge's) is older; `setup.R` runs it first
+  - Pseudobulk heatmap in `04_differential_expression.R --pseudobulk` (`PlotAnnotatedHeatmap`)
+  - `--umap_init` for scripts 01, 02, 03, 05 (RunUMAP `uwot.init`); `--svd_method` for CCA integration in 03; `--threads` for 05
+  - `tests/make_xenium_fixture.R` writes a synthetic Xenium folder; the demo tests now cover scripts 01-08
 
 ### Changed
 - `tests/run_demo_tests.R` now integrates the validation framework and reports detailed check counts
@@ -33,6 +40,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Conda environments: removed `bioconductor-batchelor` (no osx-arm64 build), install presto from bioconda, add `r-remotes`, drop the `defaults` channel, require Snakemake >= 8 and Nextflow >= 24.04
 - Snakemake container docs use `--sdm apptainer` (Snakemake >= 8) instead of the removed `--use-singularity`
 - `make clean` also removes Nextflow/Snakemake work directories and pipeline result folders
+- Requires Seurat >= 6.0: scripts stop with install instructions on older versions. Docker image uses `rocker/r-ver:4.6.2` (Seurat 6 is newer than the R 4.5.3 package snapshot). Conda environments add the Seurat 6 build dependencies and the packages for the new features
+- `--threads` now uses Seurat's native multithreading (`setThreads()`) instead of `future` multisession workers: threads share one copy of the data, so memory no longer grows with the thread count (SCTransform on pbmc3k: 2.6 GB with 1 thread, 2.8 GB with 4)
+- `setup.R` installs ComplexHeatmap and destiny by default and the spatial readers with `--all`; it installs destiny 3.26 from Bioconductor 3.23 when the older release can't install (its `smoother` dependency was archived on CRAN), and sets a CRAN mirror when none is configured
 
 ### Fixed
 - Nextflow pipeline failed to start on Nextflow >= 26 (strict syntax parser): moved top-level `--help`/input checks into the workflow and removed the function from `nextflow.config`

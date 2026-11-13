@@ -32,6 +32,10 @@ conda activate seurat-cli
 ```
 
 This installs R, Seurat, Snakemake, Nextflow, and all dependencies in one command.
+The scripts need Seurat >= 6.0, which conda-forge may not have yet; then run
+`Rscript setup.R` in the activated environment (it builds Seurat 6 from CRAN via
+`install_seurat.R` and installs the demo datasets). `tests/test_pipelines.sh`
+does this automatically.
 
 ### Option 1b: Conda (Slower Alternative)
 
