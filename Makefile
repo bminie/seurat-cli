@@ -1,7 +1,7 @@
 # Makefile for Seurat CLI
 # Common tasks for development and testing
 
-.PHONY: help setup test test-quick test-all test-pipelines test-dry-run check-deps clean lint env env-r
+.PHONY: help setup test test-quick test-all test-pipelines test-dry-run check-deps clean lint env env-r install-seurat
 
 help:
 	@echo "Seurat CLI - Available Commands"
@@ -10,6 +10,7 @@ help:
 	@echo "  make env              - Create conda environment (full) [requires mamba - recommended]"
 	@echo "  make env-r            - Create conda environment (R-only) [requires mamba - recommended]"
 	@echo "  make setup            - Install R packages via setup.R [requires R >= 4.2]"
+	@echo "  make install-seurat   - Install/upgrade Seurat to the required version (from CRAN)"
 	@echo "  make setup-all        - Install all R packages including optional [requires R >= 4.2]"
 	@echo ""
 	@echo "  Note: mamba is strongly recommended over conda for faster environment creation."
@@ -79,6 +80,9 @@ env-r:
 setup:
 	Rscript setup.R
 
+install-seurat:
+	Rscript install_seurat.R
+
 setup-all:
 	Rscript setup.R --all
 
@@ -126,7 +130,7 @@ check-deps:
 # Linting
 lint:
 	@echo "Checking R syntax..."
-	@fail=0; for f in scripts/*.R utils/*.R tests/*.R; do \
+	@fail=0; for f in scripts/*.R utils/*.R tests/*.R setup.R install_seurat.R; do \
 		if Rscript -e "invisible(parse('$$f'))" > /dev/null 2>&1; then \
 			echo "  ✓ $$f"; \
 		else \

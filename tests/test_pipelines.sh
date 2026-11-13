@@ -490,6 +490,22 @@ install_r_extras() {
         cat("  R extras check complete\n")
     '
 
+    # conda-forge may still ship an older Seurat than the scripts need;
+    # install_seurat.R builds the required release from CRAN if so
+    echo "  Checking the Seurat version..."
+    local seurat_status
+    if in_target_env; then
+        Rscript "${PROJECT_DIR}/install_seurat.R"
+        seurat_status=$?
+    else
+        "$pkg_manager" run -n "$CONDA_ENV_NAME" Rscript "${PROJECT_DIR}/install_seurat.R"
+        seurat_status=$?
+    fi
+    if [[ $seurat_status -ne 0 ]]; then
+        echo -e "${RED}Could not install the required Seurat version${NC}"
+        return 1
+    fi
+
     echo "  Checking for SeuratData, presto, and demo datasets..."
 
     if in_target_env; then
@@ -694,7 +710,7 @@ fi
 
 # Install R extras (SeuratData, presto, demo datasets) - only for full tests
 if [[ "$DRY_RUN_ONLY" != true && "$CHECK_ONLY" != true ]]; then
-    install_r_extras
+    install_r_extras || exit 1
 fi
 
 # If --check flag, exit after dependency check

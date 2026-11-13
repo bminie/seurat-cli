@@ -31,6 +31,12 @@ if (length(args) == 0) {
 # Increase timeout for large downloads (datasets can be 400MB+)
 options(timeout = 600)
 
+# Use the main CRAN mirror when none is set (conda's R leaves it unset, which
+# makes install.packages() fail in non-interactive sessions)
+if (is.null(getOption("repos")) || getOption("repos")[["CRAN"]] %in% c("", "@CRAN@")) {
+  options(repos = c(CRAN = "https://cloud.r-project.org"))
+}
+
 # -----------------------------------------------------------------------------
 # Helper Functions
 # -----------------------------------------------------------------------------
@@ -70,6 +76,35 @@ install_if_missing <- function(pkg, source = "CRAN", repo = NULL) {
   }
 }
 
+# destiny (diffusion maps for 07_sample_level.R): Bioconductor releases before
+# 3.23 depend on 'smoother', which CRAN archived in December 2025, so they no
+# longer install. destiny 3.26.0 (Bioconductor 3.23) dropped that dependency
+# and also installs on older R versions.
+install_destiny <- function() {
+  if (requireNamespace("destiny", quietly = TRUE)) {
+    cat("  ✓ destiny already installed\n")
+    return(TRUE)
+  }
+  if (install_if_missing("destiny", "Bioconductor")) return(TRUE)
+
+  cat("  Retrying with destiny 3.26.0 from Bioconductor 3.23...\n")
+  tryCatch({
+    if (!requireNamespace("remotes", quietly = TRUE)) {
+      install.packages("remotes", quiet = TRUE)
+    }
+    old <- options(repos = BiocManager::repositories())
+    on.exit(options(old))
+    remotes::install_url(
+      "https://bioconductor.org/packages/3.23/bioc/src/contrib/destiny_3.26.0.tar.gz",
+      dependencies = NA, upgrade = "never", quiet = TRUE)
+  }, error = function(e) cat(sprintf("    Error: %s\n", e$message)))
+
+  ok <- requireNamespace("destiny", quietly = TRUE)
+  cat(sprintf("    %s destiny %s\n", if (ok) "✓" else "✗",
+              if (ok) "installed successfully" else "installation failed"))
+  ok
+}
+
 install_seurat_dataset <- function(dataset_name) {
   # Check if dataset package is installed
   pkg_name <- paste0(dataset_name, ".SeuratData")
@@ -105,8 +140,18 @@ results <- list()
 # =============================================================================
 
 cat("Step 1: Installing core packages...\n")
+
+# Seurat itself goes through install_seurat.R, which installs the required
+# release from CRAN when the installed copy (e.g. conda-forge's) is too old
+setup_dir <- local({
+  file_arg <- grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE)
+  if (length(file_arg) > 0) dirname(normalizePath(sub("^--file=", "", file_arg))) else "."
+})
+status <- system2(file.path(R.home("bin"), "Rscript"),
+                  shQuote(file.path(setup_dir, "install_seurat.R")))
+results[["Seurat"]] <- identical(status, 0L)
+
 core_packages <- c(
-  "Seurat",
   "dplyr",
   "ggplot2",
   "patchwork",
@@ -146,6 +191,11 @@ if (!minimal) {
   # Bioconductor packages (for SCTransform v2)
   cat("\n  From Bioconductor:\n")
   results[["glmGamPoi"]] <- install_if_missing("glmGamPoi", "Bioconductor")
+
+  # Seurat 6 features: annotated heatmaps (04 pseudobulk, 07) and diffusion
+  # maps (07 sample-level analysis)
+  results[["ComplexHeatmap"]] <- install_if_missing("ComplexHeatmap", "Bioconductor")
+  results[["destiny"]] <- install_destiny()
 }
 
 # =============================================================================
@@ -181,6 +231,14 @@ if (install_all) {
   bioc_optional <- c("batchelor", "scran", "scater")
   for (pkg in bioc_optional) {
     results[[pkg]] <- install_if_missing(pkg, "Bioconductor")
+  }
+
+  # 08_spatial.R: Parquet files in newer Xenium outputs, the zarr archives
+  # of Atera outputs, and sf for zoomed views (--crop). Sparse PLS for
+  # 07_sample_level.R --pls_method spls.
+  cat("\n  Spatial formats and sparse PLS (CRAN):\n")
+  for (pkg in c("arrow", "blosc", "jsonlite", "data.table", "sf", "spls")) {
+    results[[pkg]] <- install_if_missing(pkg, "CRAN")
   }
 }
 

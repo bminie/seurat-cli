@@ -33,8 +33,21 @@ dependencies:
   - r-essentials
 
   # Seurat and dependencies
+  # seurat-cli needs Seurat >= 6.0. conda-forge may still be on 5.x: after
+  # creating the environment, run `Rscript install_seurat.R` (setup.R does
+  # this) to build Seurat 6 from CRAN on top of conda's r-seurat.
   - r-seurat>=5.0
-  - r-seuratobject
+  - r-seuratobject>=5.0.2
+  # Seurat 6 dependencies that conda's r-seurat 5.x doesn't pull in, and the
+  # headers needed to compile it (LinkingTo). RcppThread is also needed, but
+  # conda-forge has no osx-arm64 build for current R, so install_seurat.R
+  # installs it from CRAN.
+  - r-pls
+  - r-parallelly
+  - r-rcppeigen
+  - r-rcppprogress
+  - r-rcppannoy
+  - r-rspectra
 
   # Required R packages
   - r-dplyr
@@ -64,6 +77,24 @@ dependencies:
 
   # Faster marker finding
   - r-presto
+
+  # Seurat 6 features
+  # Annotated heatmaps (04 pseudobulk, 07 sample-level)
+  - bioconductor-complexheatmap
+  - r-circlize
+  # 07 sample-level analysis: sparse PLS, and ranger for destiny (destiny
+  # itself comes from setup.R: bioconda has no osx-arm64 build, and ranger
+  # doesn't compile with conda's clang on macOS)
+  - r-spls
+  - r-ranger
+  # 08 spatial: Parquet (Xenium) and zarr/blosc (Atera) readers; the R blosc
+  # package is installed by setup.R and builds against these libraries
+  - r-arrow
+  - r-data.table
+  - r-sf  # zoomed views (--crop)
+  - r-jsonlite
+  - blosc
+  - pkg-config
 
   # For installing SeuratData from GitHub (via setup.R)
   - r-remotes

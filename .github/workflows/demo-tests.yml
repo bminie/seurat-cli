@@ -12,7 +12,7 @@ on:
 
 jobs:
   demo-tests:
-    name: Demo tests (scripts 01-06)
+    name: Demo tests (scripts 01-08)
     runs-on: ubuntu-latest
     timeout-minutes: 60
     defaults:
@@ -32,7 +32,9 @@ jobs:
       - name: Show R and Seurat versions
         run: Rscript -e 'cat(R.version.string, "\nSeurat", as.character(packageVersion("Seurat")), "\n")'
 
-      - name: Install SeuratData and demo datasets
+      # Also installs Seurat 6 from CRAN while conda-forge is on 5.x
+      # (install_seurat.R), destiny, and ComplexHeatmap
+      - name: Install Seurat 6, SeuratData, and demo datasets
         env:
           # remotes::install_github uses this to avoid GitHub API rate limits
           GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
