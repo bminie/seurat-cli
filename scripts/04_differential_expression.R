@@ -177,20 +177,13 @@ log_message("Starting differential expression analysis", log_env)
 log_message(sprintf("Mode: %s", args$mode), log_env)
 log_message(sprintf("Test: %s", args$test_use), log_env)
 
-# Note: future parallelization with multisession can cause issues with
-# FindAllMarkers/FindMarkers in Seurat (returns 0 results due to serialization issues).
-# Using sequential processing for reliability. Seurat's presto package provides
-# fast marker finding without needing future parallelization.
-if (args$threads > 1) {
-  log_message(sprintf("Note: Using %d threads (presto acceleration if available)", args$threads), log_env)
-}
-
 # -----------------------------------------------------------------------------
 # Load Required Packages
 # -----------------------------------------------------------------------------
 
 log_message("Loading required packages...", log_env)
 load_seurat_deps(quiet = !args$verbose)
+setup_threads(args$threads, log_env)
 
 # Install test-specific packages
 if (args$test_use == "MAST") {
@@ -553,6 +546,34 @@ if (args$mode == "all_markers" && nrow(sig_results) > 0) {
       theme(text = element_text(size = 8))
     save_plot(p_heatmap, "heatmap_top_markers.png", output_dir = args$output,
               width = 12, height = max(8, length(top_genes) * 0.25))
+  }
+}
+
+# Pseudobulk heatmap: top up- and down-regulated genes across the pseudobulk
+# samples, ordered and annotated by condition (PlotAnnotatedHeatmap, Seurat 6)
+if (args$pseudobulk && nrow(sig_results) > 0) {
+  if (!requireNamespace("ComplexHeatmap", quietly = TRUE)) {
+    log_message("Skipping pseudobulk heatmap: it needs the ComplexHeatmap package (Bioconductor)",
+                log_env)
+  } else {
+    n_each <- max(1, floor(min(args$top_n, 40) / 2))
+    top_by <- function(direction) {
+      sig_results |>
+        filter(sign(avg_log2FC) == direction) |>
+        arrange(p_val_adj) |>
+        head(n_each) |>
+        pull(gene)
+    }
+    hm_genes <- c(top_by(1), rev(top_by(-1)))
+    hm_bulk <- subset(bulk, idents = compared)
+    hm_bulk <- NormalizeData(hm_bulk, verbose = FALSE)
+    hm_bulk <- ScaleData(hm_bulk, features = hm_genes, verbose = FALSE)
+    ht <- PlotAnnotatedHeatmap(hm_bulk, features = hm_genes, sort.by = "pb_condition",
+                               anno.var = "pb_condition", show.column.names = TRUE,
+                               row.font.size = 8)
+    save_complex_heatmap(ht, "pseudobulk_heatmap.png", output_dir = args$output,
+                         width = max(8, ncol(hm_bulk) * 0.4 + 4),
+                         height = max(6, length(hm_genes) * 0.18 + 3))
   }
 }
 

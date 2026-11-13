@@ -92,10 +92,15 @@ option_list <- list(
               help = "Maximum percent mitochondrial [default: %default]"),
 
   # General
+  make_option(c("-t", "--threads"), type = "integer", default = 1,
+              help = "Number of threads [default: %default]"),
   make_option(c("-v", "--verbose"), action = "store_true", default = TRUE,
               help = "Verbose output"),
   make_option(c("-q", "--quiet"), action = "store_false", dest = "verbose",
               help = "Suppress messages"),
+  make_option("--umap_init", type = "character", default = "spectral",
+              help = paste("UMAP initialization: spectral, pca, spca, random, lvrandom,",
+                           "laplacian, normlaplacian or agspectral [default: %default]")),
   make_option("--seed", type = "integer", default = 42,
               help = "Random seed [default: %default]"),
   make_option("--demo", action = "store_true", default = FALSE,
@@ -109,6 +114,7 @@ parser <- OptionParser(
 )
 
 args <- parse_args(parser)
+check_umap_init(args$umap_init)
 
 # Validate
 if (!args$demo && is.null(args$input)) {
@@ -148,6 +154,7 @@ log_message("Starting cell cycle analysis", log_env)
 
 log_message("Loading required packages...", log_env)
 load_seurat_deps(quiet = !args$verbose)
+setup_threads(args$threads, log_env)
 
 # -----------------------------------------------------------------------------
 # Load or Prepare Cell Cycle Genes
@@ -353,6 +360,7 @@ save_plot(p_pca_s + p_pca_g2m, "02_pca_scores_before.png",
 
 # UMAP
 seurat_obj <- RunUMAP(seurat_obj, dims = dims_use, reduction.name = "umap_before",
+                       uwot.init = args$umap_init,
                        verbose = args$verbose)
 
 p_umap_phase <- DimPlot(seurat_obj, reduction = "umap_before", group.by = "Phase") +
@@ -428,6 +436,7 @@ if (args$regress_cc || args$regress_cc_difference) {
   seurat_obj <- RunUMAP(seurat_obj, dims = dims_use,
                          reduction = "pca_regressed",
                          reduction.name = "umap_after",
+                         uwot.init = args$umap_init,
                          verbose = args$verbose)
 
   p_umap_phase_after <- DimPlot(seurat_obj, reduction = "umap_after", group.by = "Phase") +

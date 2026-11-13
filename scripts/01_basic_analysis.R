@@ -115,6 +115,9 @@ option_list <- list(
               help = "Verbose output"),
   make_option(c("-q", "--quiet"), action = "store_false", dest = "verbose",
               help = "Suppress messages"),
+  make_option("--umap_init", type = "character", default = "spectral",
+              help = paste("UMAP initialization: spectral, pca, spca, random, lvrandom,",
+                           "laplacian, normlaplacian or agspectral [default: %default]")),
   make_option("--seed", type = "integer", default = 42,
               help = "Random seed [default: %default]"),
 
@@ -130,6 +133,7 @@ parser <- OptionParser(
 )
 
 args <- parse_args(parser)
+check_umap_init(args$umap_init)
 
 # -----------------------------------------------------------------------------
 # Validate Arguments
@@ -171,18 +175,13 @@ log_message("Starting PBMC3K-style analysis workflow", log_env)
 log_message(sprintf("Output directory: %s", args$output), log_env)
 
 # Set up parallelization
-if (args$threads > 1) {
-  library(future)
-  plan(multisession, workers = args$threads)
-  log_message(sprintf("Using %d threads", args$threads), log_env)
-}
-
 # -----------------------------------------------------------------------------
 # Load Required Packages
 # -----------------------------------------------------------------------------
 
 log_message("Loading required packages...", log_env)
 load_seurat_deps(quiet = !args$verbose)
+setup_threads(args$threads, log_env)
 
 # -----------------------------------------------------------------------------
 # Load Data
@@ -365,6 +364,7 @@ log_message("Running UMAP...", log_env)
 seurat_obj <- RunUMAP(
   seurat_obj,
   dims = dims_use,
+  uwot.init = args$umap_init,
   verbose = args$verbose
 )
 

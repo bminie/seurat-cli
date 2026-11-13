@@ -44,6 +44,48 @@ install_and_load <- function(packages = NULL, bioc_packages = NULL, quiet = FALS
   }
 }
 
+#' Oldest Seurat release the scripts support
+#'
+#' install_seurat.R and the Docker image install at least this version.
+seurat_min_version <- "6.0.0"
+
+#' Stop with install instructions if the installed Seurat is too old
+check_seurat_version <- function() {
+  installed <- utils::packageVersion("Seurat")
+  if (installed < seurat_min_version) {
+    stop(sprintf(paste0(
+      "Seurat >= %s is required, but %s is installed.\n",
+      "Upgrade it with: Rscript install_seurat.R (from the seurat-cli directory).\n",
+      "conda-forge may not have Seurat %s yet; the script installs it from CRAN."),
+      seurat_min_version, installed, seurat_min_version), call. = FALSE)
+  }
+  invisible(installed)
+}
+
+#' Use n threads for Seurat's multithreaded steps
+#'
+#' Seurat (>= 5.6) runs NormalizeData, FindVariableFeatures, ScaleData,
+#' SCTransform, RunPCA, FindNeighbors, FindClusters, RunUMAP and CCA/RPCA
+#' integration in multithreaded C++ code, set with setThreads(). The threads
+#' share one copy of the data, unlike future's multisession workers, which each
+#' hold a copy. Call after load_seurat_deps().
+#'
+#' @param n Requested number of threads
+#' @param log_env Logging environment from init_logging()
+#' @return Number of threads used (invisibly)
+setup_threads <- function(n, log_env = NULL) {
+  n <- max(1L, as.integer(n))
+  available <- parallel::detectCores()
+  if (!is.na(available) && n > available) {
+    log_message(sprintf("Requested %d threads but only %d cores are available; using %d",
+                        n, available, available), log_env)
+    n <- as.integer(available)
+  }
+  Seurat::setThreads(n, verbose = FALSE)
+  if (n > 1) log_message(sprintf("Using %d threads", n), log_env)
+  invisible(n)
+}
+
 #' Load core Seurat dependencies
 #'
 #' SeuratData is only needed for demo mode, so it is loaded by
@@ -51,6 +93,7 @@ install_and_load <- function(packages = NULL, bioc_packages = NULL, quiet = FALS
 #'
 #' @param quiet Logical, suppress messages
 load_seurat_deps <- function(quiet = FALSE) {
+  if (requireNamespace("Seurat", quietly = TRUE)) check_seurat_version()
   core_packages <- c("Seurat", "dplyr", "ggplot2", "patchwork")
   install_and_load(packages = core_packages, quiet = quiet)
 }
@@ -77,6 +120,66 @@ load_demo_dataset <- function(dataset) {
   data_env <- new.env()
   utils::data(list = dataset, envir = data_env)
   UpdateSeuratObject(data_env[[dataset]])
+}
+
+#' Directory for downloaded demo files
+#'
+#' Defaults to the user cache directory for seurat-cli; set SEURAT_CLI_CACHE
+#' to use a different one.
+cache_dir <- function() {
+  dir <- Sys.getenv("SEURAT_CLI_CACHE", tools::R_user_dir("seurat-cli", which = "cache"))
+  dir.create(dir, recursive = TRUE, showWarnings = FALSE)
+  dir
+}
+
+#' Download a file once, then reuse the cached copy
+#'
+#' @param url File URL
+#' @param filename Name for the cached file
+#' @return Path to the cached file
+cached_download <- function(url, filename = basename(url)) {
+  path <- file.path(cache_dir(), filename)
+  if (!file.exists(path)) {
+    message(sprintf("Downloading %s", url))
+    partial <- paste0(path, ".part")
+    status <- tryCatch(utils::download.file(url, partial, mode = "wb", quiet = TRUE),
+                       error = function(e) 1L)
+    if (!identical(as.integer(status), 0L) || !file.exists(partial)) {
+      unlink(partial)
+      stop(sprintf("Could not download %s", url), call. = FALSE)
+    }
+    file.rename(partial, path)
+  }
+  path
+}
+
+#' Add donor IDs to the ifnb demo dataset
+#'
+#' ifnb pools cells from 8 donors per condition. Donor identities come from
+#' the demuxlet calls published with Kang et al. 2018, as in Seurat's
+#' differential expression tutorial: only confident singlet calls are kept,
+#' and cells without a donor ID are dropped. The files (~5 MB) are downloaded
+#' once and cached.
+#'
+#' @param ifnb ifnb Seurat object from load_demo_dataset("ifnb")
+#' @return ifnb with a donor_id column, subset to cells with a donor ID
+add_ifnb_donor_ids <- function(ifnb) {
+  base_url <- "https://raw.githubusercontent.com/yelabucsf/demuxlet_paper_code/master/fig3/"
+  read_calls <- function(file) {
+    utils::read.table(cached_download(paste0(base_url, file)), header = TRUE,
+                      stringsAsFactors = FALSE)
+  }
+  info <- rbind(read_calls("ye1.ctrl.8.10.sm.best"), read_calls("ye2.stim.8.10.sm.best"))
+
+  # ifnb cell names use "." where the demuxlet barcodes use "-"
+  info$BARCODE <- gsub("-", ".", info$BARCODE, fixed = TRUE)
+  info <- info[grep("SNG", info$BEST), ]
+  # Barcodes seen in both conditions can't be assigned unambiguously
+  info <- info[!duplicated(info$BARCODE) & !duplicated(info$BARCODE, fromLast = TRUE), ]
+
+  donor <- stats::setNames(info$BEST, info$BARCODE)[colnames(ifnb)]
+  ifnb$donor_id <- unname(donor)
+  ifnb[, !is.na(ifnb$donor_id)]
 }
 
 # -----------------------------------------------------------------------------
@@ -294,6 +397,32 @@ save_plot <- function(plot,
   return(output_path)
 }
 
+#' Save a ComplexHeatmap object (e.g. from PlotAnnotatedHeatmap()) as a PNG
+#'
+#' ggsave() can't draw these, so this opens a png device and draws the
+#' heatmap with its legends below it.
+#'
+#' @param ht ComplexHeatmap Heatmap object
+#' @param filename Output file name
+#' @param output_dir Output directory
+#' @param width,height Size in inches
+#' @param dpi Resolution
+#' @return Path to the saved file
+save_complex_heatmap <- function(ht, filename, output_dir = "output",
+                                 width = 10, height = 8, dpi = 300) {
+  if (!dir.exists(output_dir)) {
+    dir.create(output_dir, recursive = TRUE)
+  }
+  output_path <- file.path(output_dir, filename)
+  message(sprintf("Saving plot to: %s", output_path))
+
+  grDevices::png(output_path, width = width, height = height, units = "in", res = dpi)
+  on.exit(grDevices::dev.off())
+  ComplexHeatmap::draw(ht, heatmap_legend_side = "bottom",
+                       annotation_legend_side = "bottom")
+  output_path
+}
+
 #' Add scaled values for features so DoHeatmap can plot them
 #'
 #' DoHeatmap only plots features in the scale.data layer, which usually holds
@@ -425,6 +554,21 @@ get_common_parser <- function() {
   )
 
   return(OptionParser(option_list = option_list))
+}
+
+#' UMAP initialization methods accepted by --umap_init
+#'
+#' Passed to RunUMAP(uwot.init = ...), which hands them to uwot's `init`.
+umap_init_methods <- c("spectral", "normlaplacian", "random", "lvrandom",
+                       "laplacian", "pca", "spca", "agspectral")
+
+#' Stop if --umap_init is not a known uwot initialization method
+check_umap_init <- function(init) {
+  if (!init %in% umap_init_methods) {
+    stop(sprintf("Unknown --umap_init '%s'. Choose one of: %s",
+                 init, paste(umap_init_methods, collapse = ", ")), call. = FALSE)
+  }
+  invisible(init)
 }
 
 #' Print analysis summary

@@ -94,6 +94,10 @@ option_list <- list(
               help = "Index of reference sample (1-based) for CCA/RPCA. NULL = no reference"),
   make_option("--k_anchor", type = "integer", default = 5,
               help = "Number of neighbors used to pick anchors (CCA/RPCA) [default: %default]"),
+  make_option("--svd_method", type = "character", default = "auto",
+              help = paste("SVD backend for CCA integration: auto, irlba or rspectra.",
+                           "auto picks rspectra for large dense inputs, which avoids",
+                           "building the cell-by-cell matrix [default: %default]")),
 
   # Dimensional Reduction
   make_option("--n_pcs", type = "integer", default = 50,
@@ -122,6 +126,9 @@ option_list <- list(
               help = "Verbose output"),
   make_option(c("-q", "--quiet"), action = "store_false", dest = "verbose",
               help = "Suppress messages"),
+  make_option("--umap_init", type = "character", default = "spectral",
+              help = paste("UMAP initialization: spectral, pca, spca, random, lvrandom,",
+                           "laplacian, normlaplacian or agspectral [default: %default]")),
   make_option("--seed", type = "integer", default = 42,
               help = "Random seed [default: %default]"),
 
@@ -137,6 +144,7 @@ parser <- OptionParser(
 )
 
 args <- parse_args(parser)
+check_umap_init(args$umap_init)
 
 # -----------------------------------------------------------------------------
 # Validate Arguments
@@ -156,6 +164,12 @@ if (!args$method %in% valid_methods) {
 if (!args$normalization %in% c("LogNormalize", "SCT")) {
   stop(sprintf("Unknown --normalization '%s'. Choose LogNormalize or SCT", args$normalization))
 }
+
+if (!args$svd_method %in% c("auto", "irlba", "rspectra")) {
+  stop(sprintf("Unknown --svd_method '%s'. Choose auto, irlba or rspectra", args$svd_method))
+}
+# NULL lets Seurat choose the backend
+svd_method <- if (args$svd_method == "auto") NULL else args$svd_method
 
 # Parse dims
 parse_dims <- function(dims_str) {
@@ -192,18 +206,13 @@ log_message("Starting integration workflow", log_env)
 log_message(sprintf("Integration method: %s", args$method), log_env)
 log_message(sprintf("Normalization: %s", args$normalization), log_env)
 
-if (args$threads > 1) {
-  library(future)
-  plan(multisession, workers = args$threads)
-  log_message(sprintf("Using %d threads", args$threads), log_env)
-}
-
 # -----------------------------------------------------------------------------
 # Load Required Packages
 # -----------------------------------------------------------------------------
 
 log_message("Loading required packages...", log_env)
 load_seurat_deps(quiet = !args$verbose)
+setup_threads(args$threads, log_env)
 
 # Load additional packages for specific methods
 if (args$method == "HarmonyIntegration") {
@@ -375,6 +384,7 @@ seurat_obj <- RunPCA(seurat_obj, npcs = args$n_pcs, verbose = args$verbose)
 
 # UMAP before integration
 seurat_obj <- RunUMAP(seurat_obj, dims = dims_use, reduction.name = "umap.unintegrated",
+                       uwot.init = args$umap_init,
                        verbose = args$verbose)
 
 p_pre_integration <- DimPlot(seurat_obj, reduction = "umap.unintegrated",
@@ -391,7 +401,9 @@ save_plot(p_pre_integration, "02_umap_before_integration.png",
 log_message(sprintf("Running integration (%s)...", args$method), log_env)
 
 # Seurat v5 integration. Anchor-based methods (CCA/RPCA) also take the
-# normalization method, dims, k.anchor, and an optional reference sample.
+# normalization method, dims, k.anchor, an optional reference sample, and the
+# SVD backend (used only by CCA; RPCA passes it on to FindIntegrationAnchors,
+# which ignores it for reduction = "rpca").
 # IntegrateLayers is called directly (not via do.call): Seurat's SCT
 # integration checks fail when the call is built with do.call.
 if (args$method %in% c("CCAIntegration", "RPCAIntegration")) {
@@ -407,6 +419,7 @@ if (args$method %in% c("CCAIntegration", "RPCAIntegration")) {
     dims = dims_use,
     k.anchor = args$k_anchor,
     reference = args$reference,
+    svd.method = svd_method,
     verbose = args$verbose
   )
 } else {
@@ -440,6 +453,7 @@ seurat_obj <- RunUMAP(
   reduction = "integrated",
   dims = dims_use,
   reduction.name = "umap.integrated",
+  uwot.init = args$umap_init,
   verbose = args$verbose
 )
 
