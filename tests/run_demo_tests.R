@@ -18,7 +18,7 @@ option_list <- list(
   make_option("--quick", action = "store_true", default = FALSE,
               help = "Quick test (scripts 1-2 only)"),
   make_option("--script", type = "integer", default = NULL,
-              help = "Run specific script number (1-6)"),
+              help = "Run specific script number (1-8)"),
   make_option("--output_base", type = "character", default = "test_output",
               help = "Base output directory [default: %default]"),
   make_option("--cleanup", action = "store_true", default = FALSE,
@@ -74,13 +74,28 @@ tests <- list(
     script = "scripts/06_visualization.R",
     args = c("--demo"),
     description = "Visualization suite"
+  ),
+  list(
+    name = "07_sample_level",
+    script = "scripts/07_sample_level.R",
+    args = c("--demo"),
+    description = "scSLIDE sample-level analysis with IFNB donors"
+  ),
+  list(
+    name = "08_spatial",
+    script = "scripts/08_spatial.R",
+    # Runs on a synthetic Xenium folder written by the setup script
+    setup = "tests/make_xenium_fixture.R",
+    args = c("--input", "{fixture}", "--molecules", "GeneA1,GeneB1,GeneC1",
+             "--crop", "80,130,80,130", "--npcs", "10", "--dims_use", "1:10"),
+    description = "Imaging spatial analysis on synthetic Xenium data"
   )
 )
 
 # Filter tests
 if (!is.null(args$script)) {
-  if (args$script < 1 || args$script > 6) {
-    stop("Script number must be 1-6")
+  if (args$script < 1 || args$script > length(tests)) {
+    stop(sprintf("Script number must be 1-%d", length(tests)))
   }
   tests <- tests[args$script]
 } else if (args$quick) {
@@ -152,7 +167,19 @@ for (i in seq_along(tests)) {
   if (!args$validation_only) {
     # Build command
     script_path <- file.path(project_dir, test$script)
-    cmd_args <- c(test$args, "--output", output_dir, "--quiet")
+    test_args <- test$args
+
+    # Tests without a demo dataset first write their input data
+    if (!is.null(test$setup)) {
+      fixture_dir <- file.path(args$output_base, "fixtures", test$name)
+      unlink(fixture_dir, recursive = TRUE)
+      setup_cmd <- paste("Rscript", shQuote(file.path(project_dir, test$setup)),
+                         shQuote(fixture_dir))
+      cat("Setup:", setup_cmd, "\n")
+      if (system(setup_cmd) != 0) stop("Test setup failed: ", test$setup)
+      test_args <- gsub("{fixture}", fixture_dir, test_args, fixed = TRUE)
+    }
+    cmd_args <- c(shQuote(test_args), "--output", output_dir, "--quiet")
     cmd <- paste("Rscript", shQuote(script_path), paste(cmd_args, collapse = " "))
 
     cat("Command:", cmd, "\n\n")

@@ -285,8 +285,10 @@ validate_figures <- function(output_dir, n_sample = 20000) {
 #' @param rds_path Path to Seurat RDS file
 #' @param expected_reductions Character vector of expected reduction names
 #' @param expected_assays Character vector of expected assay names
+#' @param expect_clusters Whether the object should have seurat_clusters
 validate_seurat_object <- function(rds_path, expected_reductions = c("pca", "umap"),
-                                    expected_assays = c("RNA")) {
+                                    expected_assays = c("RNA"),
+                                    expect_clusters = TRUE) {
   results <- list()
 
   if (!file.exists(rds_path)) {
@@ -337,12 +339,14 @@ validate_seurat_object <- function(rds_path, expected_reductions = c("pca", "uma
     sprintf("Object has cells (n=%d)", n_cells)
   )
 
-  # Check has cluster metadata
-  has_clusters <- "seurat_clusters" %in% colnames(obj@meta.data)
-  results[["has_cluster_metadata"]] <- validation_result(
-    has_clusters,
-    "Has seurat_clusters metadata"
-  )
+  # Check has cluster metadata (sample-level objects have no clusters)
+  if (expect_clusters) {
+    has_clusters <- "seurat_clusters" %in% colnames(obj@meta.data)
+    results[["has_cluster_metadata"]] <- validation_result(
+      has_clusters,
+      "Has seurat_clusters metadata"
+    )
+  }
 
   results
 }
@@ -403,6 +407,27 @@ get_demo_expectations <- function(script_name) {
     "06_visualization" = list(
       dataset = "pbmc3k",
       min_plots = 5
+    ),
+    "07_sample_level" = list(
+      dataset = "ifnb with donor IDs",
+      n_samples = 16,
+      # DC1 should put every control sample on one side of every stimulated one
+      separated_by = list(response = "stim", component = "traj_DC1"),
+      # Interferon response genes should change along DC1 in CD14 monocytes
+      traj_de_file = "traj_de_CD14_Mono_DC1.csv",
+      expected_traj_genes = c("ISG15", "ISG20", "IFIT3", "IFI6", "IRF7", "OASL", "MX1", "IFITM3"),
+      min_traj_genes_found = 5,
+      min_plots = 3
+    ),
+    "08_spatial" = list(
+      dataset = "synthetic Xenium (tests/make_xenium_fixture.R)",
+      min_clusters = 3,
+      max_clusters = 4,
+      min_cells = 740,
+      max_cells = 750,
+      expected_markers = paste0("Gene", rep(c("A", "B", "C"), each = 5), 1:5),
+      min_markers_found = 12,
+      min_plots = 8
     )
   )
 
@@ -534,6 +559,50 @@ validate_demo_expectations <- function(output_dir, script_name) {
     }
   }
 
+  # Validate sample-level outputs (scSLIDE script)
+  if (!is.null(expectations$n_samples)) {
+    emb_file <- file.path(output_dir, "sample_embedding.csv")
+    if (file.exists(emb_file)) {
+      emb <- read.csv(emb_file, check.names = FALSE)
+      results[["sample_count"]] <- validation_result(
+        nrow(emb) == expectations$n_samples,
+        sprintf("Sample-level object has %d samples", expectations$n_samples),
+        if (nrow(emb) != expectations$n_samples) sprintf("Found %d samples", nrow(emb))
+      )
+
+      sep <- expectations$separated_by
+      if (!is.null(sep) && all(c(sep$response, sep$component) %in% colnames(emb))) {
+        ranges <- tapply(emb[[sep$component]], emb[[sep$response]], range)
+        separated <- length(ranges) == 2 &&
+          (max(ranges[[1]]) < min(ranges[[2]]) || max(ranges[[2]]) < min(ranges[[1]]))
+        results[["response_separated"]] <- validation_result(
+          separated,
+          sprintf("%s separates samples by %s", sep$component, sep$response),
+          if (!separated) "Groups overlap along the component"
+        )
+      }
+    }
+  }
+
+  if (!is.null(expectations$expected_traj_genes)) {
+    de_file <- file.path(output_dir, expectations$traj_de_file)
+    if (file.exists(de_file)) {
+      de <- read.csv(de_file)
+      sig_genes <- de$gene_ID[!is.na(de$adj_pval) & de$adj_pval < 0.05]
+      found <- intersect(expectations$expected_traj_genes, sig_genes)
+      enough <- length(found) >= expectations$min_traj_genes_found
+      results[["expected_traj_genes"]] <- validation_result(
+        enough,
+        sprintf("Expected trajectory genes significant (%d/%d required)",
+                length(found), expectations$min_traj_genes_found),
+        if (!enough) sprintf("Found: %s", paste(found, collapse = ", "))
+      )
+    } else {
+      results[["expected_traj_genes"]] <- validation_result(
+        FALSE, "Trajectory DE results exist", sprintf("Missing %s", expectations$traj_de_file))
+    }
+  }
+
   # Validate minimum plots (for visualization script)
   if (!is.null(expectations$min_plots)) {
     png_files <- list.files(output_dir, pattern = "\\.png$", full.names = FALSE)
@@ -573,7 +642,11 @@ run_tier1_validation <- function(output_dir, script_name) {
                                       "parameters.csv", "session_info.txt"),
     "05_cell_cycle" = c("seurat_cell_cycle.rds", "cell_cycle_scores.csv",
                          "parameters.csv", "session_info.txt"),
-    "06_visualization" = c("visualization_summary.md", "parameters.csv", "session_info.txt")
+    "06_visualization" = c("visualization_summary.md", "parameters.csv", "session_info.txt"),
+    "07_sample_level" = c("sample_object.rds", "sample_embedding.csv", "traj_de_summary.csv",
+                          "parameters.csv", "session_info.txt"),
+    "08_spatial" = c("seurat_spatial.rds", "cluster_assignments.csv", "cluster_markers_all.csv",
+                     "cell_coordinates.csv", "parameters.csv", "session_info.txt")
   )
 
   # Define RDS file and expected reductions per script
@@ -581,7 +654,10 @@ run_tier1_validation <- function(output_dir, script_name) {
     "01_basic_analysis" = list(file = "seurat_object.rds", reductions = c("pca", "umap"), assays = c("RNA")),
     "02_sctransform" = list(file = "seurat_sctransform.rds", reductions = c("pca", "umap"), assays = c("RNA", "SCT")),
     "03_integration" = list(file = "seurat_integrated.rds", reductions = c("pca", "umap"), assays = c("RNA")),
-    "05_cell_cycle" = list(file = "seurat_cell_cycle.rds", reductions = c("pca"), assays = c("RNA"))
+    "05_cell_cycle" = list(file = "seurat_cell_cycle.rds", reductions = c("pca"), assays = c("RNA")),
+    "07_sample_level" = list(file = "sample_object.rds", reductions = c("DiffMap"), assays = c("LMC"),
+                             clusters = FALSE),
+    "08_spatial" = list(file = "seurat_spatial.rds", reductions = c("pca", "umap"), assays = c("Xenium"))
   )
 
   # 1. File existence checks
@@ -590,12 +666,14 @@ run_tier1_validation <- function(output_dir, script_name) {
   }
 
   # 2. Cluster assignment validation (for scripts that produce clusters)
-  if (script_name %in% c("01_basic_analysis", "02_sctransform", "03_integration", "05_cell_cycle")) {
+  if (script_name %in% c("01_basic_analysis", "02_sctransform", "03_integration", "05_cell_cycle",
+                         "08_spatial")) {
     results[["clusters"]] <- validate_cluster_assignments(output_dir)
   }
 
   # 3. Marker validation (for scripts that produce markers)
-  if (script_name %in% c("01_basic_analysis", "02_sctransform", "03_integration", "04_differential_expression")) {
+  if (script_name %in% c("01_basic_analysis", "02_sctransform", "03_integration", "04_differential_expression",
+                         "08_spatial")) {
     results[["markers"]] <- validate_markers(output_dir)
   }
 
@@ -609,7 +687,8 @@ run_tier1_validation <- function(output_dir, script_name) {
     results[["seurat_object"]] <- validate_seurat_object(
       rds_path,
       expected_reductions = rds_info$reductions,
-      expected_assays = rds_info$assays
+      expected_assays = rds_info$assays,
+      expect_clusters = !isFALSE(rds_info$clusters)
     )
   }
 
