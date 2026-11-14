@@ -12,14 +12,17 @@
 # -----------------------------------------------------------------------------
 # Workflow Selection
 # -----------------------------------------------------------------------------
-# Options: basic, sctransform, integration, cell_cycle, full
+# Options: basic, sctransform, integration, cell_cycle, full, sample_level, spatial
 #
 # Workflow paths:
-#   basic:       01_basic_analysis → 04_de → 06_visualization
-#   sctransform: 02_sctransform → 04_de → 06_visualization
-#   integration: 03_integration → 04_de → 06_visualization
-#   cell_cycle:  02_sctransform → 05_cell_cycle → 04_de → 06_visualization
-#   full:        02_sctransform → 05_cell_cycle → 04_de → 06_visualization
+#   basic:        01_basic_analysis → 04_de → 06_visualization
+#   sctransform:  02_sctransform → 04_de → 06_visualization
+#   integration:  03_integration → 04_de → 06_visualization
+#   cell_cycle:   02_sctransform → 05_cell_cycle → 04_de → 06_visualization
+#   full:         02_sctransform → 05_cell_cycle → 04_de → 06_visualization
+#   sample_level: 03_integration → 07_sample_level (or 07 alone on
+#                 sample_level.input_rds)
+#   spatial:      08_spatial on input_path (a Xenium or Atera output folder)
 
 workflow: "sctransform"
 
@@ -39,9 +42,11 @@ output_dir: "results"
 
 # For basic/sctransform/cell_cycle workflows - single input
 # Can be: 10x directory, .h5 file, .rds file, or .csv
+# For the spatial workflow: a Xenium or Atera output folder
 input_path: "/path/to/your/data"
 
-# For integration workflow - file containing paths (one per line) or comma-separated
+# For integration and sample_level workflows - file containing paths (one per
+# line) or comma-separated
 input_list: "/path/to/sample_list.txt"
 
 # -----------------------------------------------------------------------------
@@ -100,4 +105,28 @@ cell_cycle:
 visualization:
   reduction: "umap"
   features: ""  # Comma-separated gene names, e.g., "CD3D,CD4,CD8A,MS4A1"
+  extra_args: ""
+
+# Sample-level analysis with scSLIDE (07_sample_level.R)
+# Needs at least 4 samples (ideally 10+). By default it runs on the integration
+# output, where each input_list entry is one sample and integration.conditions
+# gives the response.
+sample_level:
+  input_rds: ""                    # Existing Seurat RDS to use instead of running integration
+  sample_col: "sample"             # 03_integration.R stores sample names here
+  response: "condition"            # ... and integration.conditions here
+  celltype_col: "seurat_clusters"  # Cell types for DE (clusters if not annotated)
+  reduction: "integrated"          # Cell-type embedding
+  dims: "1:30"
+  traj_dcs: "1"                    # Diffusion components to test, e.g., "1,2"
+  latent_vars: ""                  # Sample-level covariates, e.g., "age,sex"
+  extra_args: ""
+
+# Imaging spatial analysis (08_spatial.R) on input_path
+spatial:
+  platform: "auto"         # auto, xenium, atera
+  molecules: ""            # Genes whose transcript positions to plot, e.g., "Gad1,Sst"
+  crop: ""                 # Zoomed view "xmin,xmax,ymin,ymax" in microns
+  normalization: "SCT"     # SCT or LogNormalize
+  resolution: 0.3
   extra_args: ""

@@ -24,7 +24,7 @@ nextflow.enable.dsl=2
 params.help = false
 
 // Workflow selection
-params.workflow = "sctransform"  // basic, sctransform, integration, cell_cycle, full
+params.workflow = "sctransform"  // basic, sctransform, integration, cell_cycle, full, sample_level, spatial
 
 // Input/Output
 params.input = null
@@ -74,6 +74,23 @@ params.cc_regress_difference = false
 params.viz_reduction = "umap"
 params.viz_features = ""
 
+// Sample-level (scSLIDE) parameters; defaults match 03_integration.R metadata
+params.sl_input_rds = null  // existing Seurat RDS instead of running integration
+params.sl_sample_col = "sample"
+params.sl_response = "condition"
+params.sl_celltype_col = "seurat_clusters"
+params.sl_reduction = "integrated"
+params.sl_dims = "1:30"
+params.sl_traj_dcs = "1"
+params.sl_latent_vars = ""
+
+// Spatial (Xenium/Atera) parameters
+params.sp_platform = "auto"
+params.sp_molecules = ""
+params.sp_crop = ""
+params.sp_normalization = "SCT"
+params.sp_resolution = 0.3
+
 // -----------------------------------------------------------------------------
 // Help Message
 // -----------------------------------------------------------------------------
@@ -88,11 +105,13 @@ def helpMessage() {
       nextflow run main.nf --input /path/to/data --outdir results
 
     Required:
-      --input           Input data path (10x directory, .h5, .rds, or .csv)
+      --input           Input data path (10x directory, .h5, .rds, or .csv;
+                        a Xenium/Atera output folder for --workflow spatial)
                         OR use --demo for built-in dataset
 
     Workflow Options:
-      --workflow        Workflow type: basic, sctransform, integration, cell_cycle, full
+      --workflow        Workflow type: basic, sctransform, integration, cell_cycle,
+                        full, sample_level, spatial
                         Default: sctransform
 
     Common Options:
@@ -107,6 +126,8 @@ def helpMessage() {
       integration:  03_integration → 04_de → 06_visualization
       cell_cycle:   02_sctransform → 05_cell_cycle → 04_de → 06_visualization
       full:         02_sctransform → 05_cell_cycle → 04_de → 06_visualization
+      sample_level: 03_integration → 07_sample_level (or 07 alone on --sl_input_rds)
+      spatial:      08_spatial on --input (no demo dataset)
 
     Script-Specific Parameters:
       See nextflow.config for all available parameters.
@@ -123,6 +144,13 @@ def helpMessage() {
 
       # Integration of multiple samples
       nextflow run main.nf --input_list samples.txt --workflow integration
+
+      # Sample-level analysis of integrated samples (needs >= 4 samples)
+      nextflow run main.nf --input_list samples.txt --int_conditions "c,c,t,t" \
+          --workflow sample_level
+
+      # Xenium or Atera data
+      nextflow run main.nf --input xenium_outs --workflow spatial --sp_molecules Gad1,Sst
 
     =============================================================================
     """.stripIndent()
@@ -311,6 +339,71 @@ process VISUALIZATION {
     """
 }
 
+process SAMPLE_LEVEL {
+    tag "sample_level"
+    publishDir "${params.outdir}/sample_level", mode: 'copy'
+
+    input:
+    path seurat_rds
+
+    output:
+    path "traj_de_summary.csv", emit: summary
+    path "sample_embedding.csv", emit: embedding
+    path "sample_object.rds"
+    path "*.csv"
+    path "*.png", optional: true
+    path "*.txt"
+
+    script:
+    // In demo mode the script loads ifnb with donor IDs and sets its own columns
+    def input_arg = params.demo ? "--demo" : "--input ${seurat_rds}"
+    def celltype_arg = params.sl_celltype_col ? "--celltype_col \"${params.sl_celltype_col}\"" : ""
+    def latent_arg = params.sl_latent_vars ? "--latent_vars \"${params.sl_latent_vars}\"" : ""
+    """
+    Rscript ${params.scripts_dir}/07_sample_level.R \
+        ${input_arg} \
+        --output . \
+        --sample_col "${params.sl_sample_col}" \
+        --response "${params.sl_response}" \
+        ${celltype_arg} \
+        --reduction ${params.sl_reduction} \
+        --dims "${params.sl_dims}" \
+        --traj_dcs "${params.sl_traj_dcs}" \
+        ${latent_arg} \
+        --threads ${params.threads}
+    """
+}
+
+process SPATIAL {
+    tag "spatial"
+    publishDir "${params.outdir}/spatial", mode: 'copy'
+
+    input:
+    path data_dir
+
+    output:
+    path "cluster_assignments.csv", emit: clusters
+    path "seurat_spatial.rds", emit: rds
+    path "*.csv"
+    path "*.png"
+    path "*.txt"
+
+    script:
+    def molecules_arg = params.sp_molecules ? "--molecules \"${params.sp_molecules}\"" : ""
+    def crop_arg = params.sp_crop ? "--crop \"${params.sp_crop}\"" : ""
+    """
+    Rscript ${params.scripts_dir}/08_spatial.R \
+        --input ${data_dir} \
+        --output . \
+        --platform ${params.sp_platform} \
+        --normalization ${params.sp_normalization} \
+        --resolution ${params.sp_resolution} \
+        ${molecules_arg} \
+        ${crop_arg} \
+        --threads ${params.threads}
+    """
+}
+
 // -----------------------------------------------------------------------------
 // Workflows
 // -----------------------------------------------------------------------------
@@ -392,6 +485,35 @@ workflow FULL_WORKFLOW {
     viz = VISUALIZATION.out.summary
 }
 
+workflow SAMPLE_LEVEL_WORKFLOW {
+    take:
+    input_ch
+
+    main:
+    // The demo and --sl_input_rds start from an existing object; otherwise
+    // integrate the samples first
+    def rds_ch = input_ch
+    if (!params.demo && !params.sl_input_rds) {
+        INTEGRATION(input_ch)
+        rds_ch = INTEGRATION.out.rds
+    }
+    SAMPLE_LEVEL(rds_ch)
+
+    emit:
+    summary = SAMPLE_LEVEL.out.summary
+}
+
+workflow SPATIAL_WORKFLOW {
+    take:
+    input_ch
+
+    main:
+    SPATIAL(input_ch)
+
+    emit:
+    clusters = SPATIAL.out.clusters
+}
+
 // -----------------------------------------------------------------------------
 // Main Entry Point
 // -----------------------------------------------------------------------------
@@ -403,16 +525,27 @@ workflow {
     }
 
     // Validate inputs
-    if (!params.demo && !params.input && !params.input_list) {
+    if (!params.demo && !params.input && !params.input_list && !params.sl_input_rds &&
+        params.workflow != "spatial") {
         helpMessage()
         log.error "Error: --input or --input_list is required (or use --demo)"
         exit 1
     }
+    // The spatial workflow has no demo dataset, so it ignores --demo (which
+    // the demo and test profiles set) and always reads --input
+    if (params.workflow == "spatial" && !params.input) {
+        log.error "Error: the spatial workflow has no demo dataset; set --input to a Xenium or Atera output folder"
+        exit 1
+    }
 
     // Create input channel
-    if (params.demo) {
+    if (params.workflow == "spatial") {
+        input_ch = channel.of(file(params.input, checkIfExists: true))
+    } else if (params.demo) {
         input_ch = channel.of(file("${projectDir}/dummy_input"))
-    } else if (params.workflow == "integration") {
+    } else if (params.workflow == "sample_level" && params.sl_input_rds) {
+        input_ch = channel.fromPath(params.sl_input_rds, checkIfExists: true)
+    } else if (params.workflow in ["integration", "sample_level"]) {
         input_ch = channel.fromPath(params.input_list)
     } else {
         input_ch = channel.fromPath(params.input)
@@ -429,6 +562,10 @@ workflow {
         CELLCYCLE_WORKFLOW(input_ch)
     } else if (params.workflow == "full") {
         FULL_WORKFLOW(input_ch)
+    } else if (params.workflow == "sample_level") {
+        SAMPLE_LEVEL_WORKFLOW(input_ch)
+    } else if (params.workflow == "spatial") {
+        SPATIAL_WORKFLOW(input_ch)
     } else {
         log.error "Unknown workflow: ${params.workflow}"
         exit 1

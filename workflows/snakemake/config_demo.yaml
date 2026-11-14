@@ -9,6 +9,11 @@
 # Usage:
 #   snakemake --configfile config_demo.yaml --cores 4
 #   snakemake --configfile config_demo.yaml --cores 4 --config workflow=basic
+#   snakemake --configfile config_demo.yaml --cores 4 --config workflow=sample_level
+#
+# The spatial workflow has no demo dataset; point it at a Xenium/Atera folder:
+#   snakemake --configfile config_demo.yaml --cores 4 \
+#     --config workflow=spatial input_path=/path/to/xenium_outs
 #
 # =============================================================================
 
@@ -50,3 +55,8 @@ cell_cycle:
 visualization:
   reduction: "umap"
   features: ""
+
+# Sample-level demo: script 07 loads ifnb with donor IDs itself (16 samples)
+sample_level:
+  input_rds: "DEMO"
+  extra_args: "--demo"
