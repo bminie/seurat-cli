@@ -4,21 +4,26 @@
 [![R Syntax Check](https://github.com/bminie/seurat-cli/actions/workflows/r-check.yml/badge.svg?branch=main)](https://github.com/bminie/seurat-cli/actions/workflows/r-check.yml)
 [![Nextflow](https://github.com/bminie/seurat-cli/actions/workflows/nextflow.yml/badge.svg?branch=main)](https://github.com/bminie/seurat-cli/actions/workflows/nextflow.yml)
 [![Snakemake](https://github.com/bminie/seurat-cli/actions/workflows/snakemake.yml/badge.svg?branch=main)](https://github.com/bminie/seurat-cli/actions/workflows/snakemake.yml)
+[![Docker Image](https://github.com/bminie/seurat-cli/actions/workflows/docker-publish.yml/badge.svg?branch=main)](https://github.com/bminie/seurat-cli/actions/workflows/docker-publish.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A collection of flexible, parameterized R scripts that implement the major [Seurat](https://satijalab.org/seurat/) vignettes for single-cell RNA-seq analysis.
+A collection of flexible, parameterized R scripts that implement the major [Seurat](https://satijalab.org/seurat/) vignettes for single-cell RNA-seq and imaging-based spatial transcriptomics (10x Xenium and Atera) analysis.
 
 ## Overview
 
 These scripts provide command-line interfaces to common Seurat workflows, allowing users to:
 - Run standard analyses with custom parameters
-- Process different input formats (10x, CSV, RDS)
-- Automate batch processing
+- Process different input formats (10x, CSV, RDS, Xenium and Atera output folders)
+- Automate batch processing with the Snakemake and Nextflow pipelines, locally, in Docker, or on SLURM/PBS clusters
 - Generate reproducible results with logged parameters
 
-The scripts require **Seurat 6.0 or newer**. Besides the classic vignettes they
-cover the Seurat 6 additions: sample-level analysis with scSLIDE
-(`07_sample_level.R`) and 10x Xenium/Atera imaging data (`08_spatial.R`).
+| Analysis | Scripts | Data |
+|----------|---------|------|
+| Single-cell RNA-seq | `01`–`06`: QC and clustering, SCTransform, multi-sample integration, differential expression, cell cycle, figures | 10x matrix or HDF5, CSV, Seurat RDS |
+| Sample-level | `07`: scSLIDE (Seurat 6) across many samples or donors | Integrated Seurat RDS |
+| Imaging spatial | `08`: QC, clustering, markers, and plots on the tissue | 10x Xenium or Atera output folder |
+
+The scripts require **Seurat 6.0 or newer**.
 
 ## Installation
 
@@ -193,6 +198,13 @@ Rscript scripts/01_basic_analysis.R --demo --output ./demo_results
 
 # SCTransform normalization
 Rscript scripts/02_sctransform.R --input /path/to/data --output ./sct_results
+
+# Xenium or Atera imaging data
+Rscript scripts/08_spatial.R --input /path/to/xenium_outs --output ./spatial_results
+
+# Try the spatial script without real data, on a small synthetic Xenium folder
+Rscript tests/make_xenium_fixture.R ./xenium_fixture
+Rscript scripts/08_spatial.R --input ./xenium_fixture --output ./spatial_demo
 
 # View all options for any script
 Rscript scripts/01_basic_analysis.R --help
@@ -542,9 +554,13 @@ The scripts support multiple input formats:
 
 Format is auto-detected, or specify with `--format`.
 
+`08_spatial.R` instead takes a 10x **Xenium** or **Atera** output folder
+(`--input`); the platform is detected from the folder (`--platform` to set it).
+
 ## Output Structure
 
-Each script creates a structured output directory:
+Each script creates a structured output directory. For the single-cell
+scripts it looks like this (see each script's section for its own files):
 
 ```
 output/
@@ -559,6 +575,10 @@ output/
 ├── analysis.log           # Run log
 └── *.png                  # Visualizations
 ```
+
+`08_spatial.R` writes `seurat_spatial.rds`, `cluster_assignments.csv`,
+`cluster_markers_all.csv`, `cell_coordinates.csv` (cell positions on the
+tissue), and the spatial figures.
 
 ## Example Workflows
 
@@ -621,6 +641,21 @@ Rscript scripts/04_differential_expression.R \
   --output ./de_pseudobulk
 ```
 
+### Xenium Spatial Analysis
+
+```bash
+# Clusters, markers, and spatial plots; transcript positions for four genes;
+# and a zoomed view with cell outlines (coordinates in microns)
+Rscript scripts/08_spatial.R \
+  --input /data/xenium_outs \
+  --molecules Gad1,Sst,Pvalb,Gfap \
+  --crop 2000,2600,1000,1500 \
+  --output ./xenium_results
+
+# Find a region to zoom into from the cell positions
+head ./xenium_results/cell_coordinates.csv
+```
+
 ## Workflow Pipelines
 
 For automated, reproducible analyses, use the included **Snakemake** or **Nextflow** pipelines.
@@ -675,9 +710,13 @@ nextflow run main.nf --input /path/to/xenium_outs --workflow spatial
 
 # Run with Docker
 nextflow run main.nf --input /path/to/data -profile docker
+
+# Run on a SLURM cluster with Apptainer
+nextflow run main.nf --input /path/to/data -profile slurm,apptainer
 ```
 
-See [workflows/README.md](workflows/README.md) for detailed documentation.
+See [workflows/README.md](workflows/README.md) for detailed documentation,
+including [running on an HPC cluster](workflows/README.md#running-on-an-hpc-cluster).
 
 ## Testing
 
@@ -739,7 +778,10 @@ Rscript setup.R --all      # Everything including optional integration packages
 
 The setup script also installs demo datasets:
 - **pbmc3k** (~8MB) - Used by scripts 01, 02, 04, 05, 06
-- **ifnb** (~400MB) - Used by scripts 03 (integration) and 07 (sample-level; plus ~5 MB of donor IDs downloaded on first use and cached in the user cache directory, or `$SEURAT_CLI_CACHE`)
+- **ifnb** (~400MB) - Used by scripts 03 (integration) and 07 (sample-level; plus ~5 MB of donor IDs downloaded on first use and cached in the user cache directory, or `$SEURAT_CLI_CACHE`; the Docker image already includes them)
+
+Script 08 has no demo dataset; `tests/make_xenium_fixture.R` writes a small
+synthetic Xenium folder to try it on.
 
 ### Manual Installation
 

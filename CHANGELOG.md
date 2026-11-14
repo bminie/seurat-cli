@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Snakemake SLURM profile (`workflows/snakemake/profiles/slurm`), per-rule `mem_mb`/`runtime` (`resources` in the config), and a `container` setting; `snakemake-executor-plugin-slurm` added to `environment.yml`
   - The image caches script 07's demo donor IDs, so every demo runs on compute nodes without internet access
   - "Running on an HPC Cluster" guide in `workflows/README.md`
+- README covers the spatial (Xenium/Atera) and sample-level analyses alongside single-cell: overview table, quick start (including the synthetic Xenium folder), input formats, outputs, and a Xenium example
 
 ### Changed
 - `tests/run_demo_tests.R` now integrates the validation framework and reports detailed check counts
@@ -56,6 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `setup.R` installs ComplexHeatmap and destiny by default and the spatial readers with `--all`; it installs destiny 3.26 from Bioconductor 3.23 when the older release can't install (its `smoother` dependency was archived on CRAN), and sets a CRAN mirror when none is configured
 
 ### Fixed
+- Nextflow read `--demo false` (and `--cc_regress false`, `--cc_regress_difference false`) as true: Nextflow passes command-line values as text, and any non-empty text counts as true. These options now accept true/false, yes/no, or 1/0, and stop with an error for anything else
 - Nextflow integration and sample-level runs only passed the sample list file to the task, not the samples in it, so the `docker`/`singularity` profiles couldn't read them. Each listed sample is now staged into the task
 - Snakemake `--sdm apptainer` looked for the scripts at `../../scripts`, which isn't mounted in the container; container runs now use `/app/scripts`
 - Snakemake rules declared no memory or time, so cluster executors submitted every job with the cluster's defaults

@@ -31,7 +31,7 @@
 FROM rocker/r-ver:4.6.2
 
 LABEL maintainer="bminie"
-LABEL description="Seurat CLI - Command-line tools for single-cell RNA-seq analysis"
+LABEL description="Seurat CLI - Command-line tools for single-cell RNA-seq and imaging spatial (Xenium/Atera) analysis"
 LABEL org.opencontainers.image.source="https://github.com/bminie/seurat-cli"
 
 # Set environment variables
