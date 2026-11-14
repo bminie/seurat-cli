@@ -30,8 +30,9 @@ workflow: "sctransform"
 # Paths
 # -----------------------------------------------------------------------------
 
-# Path to seurat-cli scripts directory (relative to Snakefile or absolute)
-scripts_dir: "../../scripts"
+# Path to the seurat-cli scripts. Leave unset to use this checkout's scripts/
+# folder, or the copy in the image with --sdm apptainer.
+# scripts_dir: "/path/to/seurat-cli/scripts"
 
 # Output directory for all results
 output_dir: "results"
@@ -55,6 +56,23 @@ input_list: "/path/to/sample_list.txt"
 
 species: "human"  # human or mouse
 threads: 4
+
+# -----------------------------------------------------------------------------
+# HPC
+# -----------------------------------------------------------------------------
+
+# Container image for --sdm apptainer (see profiles/slurm). Use a local .sif
+# file if compute nodes can't reach the registry:
+#   apptainer pull seurat-cli.sif docker://ghcr.io/bminie/seurat-cli:latest
+# container: "/shared/containers/seurat-cli.sif"
+
+# Memory (MB) and time limit (minutes) per rule, used by cluster executors.
+# Defaults: 8000 MB / 240 min; sctransform 6000/120, integration 16000/240,
+# differential_expression 8000/120, sample_level 16000/240, spatial 16000/240.
+# "default" here applies to every rule; a rule's own entry wins over it.
+# resources:
+#   default: {mem_mb: 8000, runtime: 240}
+#   integration: {mem_mb: 64000, runtime: 480}
 
 # -----------------------------------------------------------------------------
 # Script-Specific Parameters

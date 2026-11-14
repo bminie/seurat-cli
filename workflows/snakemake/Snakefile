@@ -12,10 +12,10 @@
 # With Apptainer/Singularity container (Snakemake >= 8):
 #   snakemake --configfile config.yaml --cores 4 --sdm apptainer
 #
+# On a SLURM cluster (needs snakemake-executor-plugin-slurm):
+#   snakemake --configfile config.yaml --workflow-profile profiles/slurm
+#
 # =============================================================================
-
-# Container image for all rules (used with --sdm apptainer)
-container: "docker://bminie/seurat-cli:latest"
 
 import os
 from pathlib import Path
@@ -27,6 +27,16 @@ from pathlib import Path
 # Set defaults
 configfile: "config.yaml"
 
+# Container image for all rules (used with --sdm apptainer). A local .sif file
+# also works, for compute nodes without internet access.
+container: config.get("container") or "docker://ghcr.io/bminie/seurat-cli:latest"
+
+def using_container():
+    """True when rules run in the container (--sdm apptainer)."""
+    methods = getattr(getattr(workflow, "deployment_settings", None),
+                      "deployment_method", None) or []
+    return any(getattr(m, "name", str(m)).upper() == "APPTAINER" for m in methods)
+
 # Workflow type: basic, sctransform, integration, cell_cycle, full,
 # sample_level, spatial
 WORKFLOW = config.get("workflow", "basic")
@@ -35,8 +45,11 @@ WORKFLOWS = ["basic", "sctransform", "integration", "cell_cycle", "full",
 if WORKFLOW not in WORKFLOWS:
     raise ValueError(f"Unknown workflow '{WORKFLOW}'. Choose one of: {', '.join(WORKFLOWS)}")
 
-# Directories
-SCRIPTS_DIR = config.get("scripts_dir", "../../scripts")
+# Directories. In the container only the working directory is mounted, so
+# rules use the scripts baked into the image; otherwise this checkout's.
+SCRIPTS_DIR = config.get("scripts_dir") or (
+    "/app/scripts" if using_container()
+    else os.path.normpath(os.path.join(workflow.basedir, "..", "..", "scripts")))
 OUTPUT_DIR = config.get("output_dir", "results")
 
 # Input files
@@ -47,6 +60,28 @@ INPUT_LIST = config.get("input_list", None)  # For integration
 SPECIES = config.get("species", "human")
 THREADS = config.get("threads", 1)
 
+# Memory (MB) and time limit (minutes) for each rule, used by cluster
+# executors such as SLURM. The defaults match the Nextflow pipeline. Under
+# "resources" in the config, "default" overrides these for every rule, and a
+# rule's own entry overrides that.
+DEFAULT_RESOURCES = {
+    "default": {"mem_mb": 8000, "runtime": 240},
+    "sctransform": {"mem_mb": 6000, "runtime": 120},
+    "integration": {"mem_mb": 16000, "runtime": 240},
+    "differential_expression": {"mem_mb": 8000, "runtime": 120},
+    "sample_level": {"mem_mb": 16000, "runtime": 240},
+    "spatial": {"mem_mb": 16000, "runtime": 240},
+}
+
+def rule_resources(rule_name):
+    """mem_mb and runtime for a rule: config overrides, then defaults."""
+    user = config.get("resources") or {}
+    res = dict(DEFAULT_RESOURCES["default"])
+    res.update(DEFAULT_RESOURCES.get(rule_name, {}))
+    res.update(user.get("default") or {})
+    res.update(user.get(rule_name) or {})
+    return res
+
 # -----------------------------------------------------------------------------
 # Helper Functions
 # -----------------------------------------------------------------------------
@@ -54,6 +89,21 @@ THREADS = config.get("threads", 1)
 def get_script_path(script_name):
     """Get full path to a script."""
     return os.path.join(SCRIPTS_DIR, script_name)
+
+def get_integration_input(wildcards):
+    """The sample list file and each sample in it, so Snakemake checks they
+    exist before submitting jobs. Nothing for the demo."""
+    if not INPUT_LIST or INPUT_LIST == "DEMO":
+        return []
+    if os.path.isfile(INPUT_LIST):
+        with open(INPUT_LIST) as f:
+            lines = f.read().splitlines()
+        listed = [INPUT_LIST]
+    else:
+        lines = INPUT_LIST.split(",")
+        listed = []
+    samples = [l.strip() for l in lines if l.strip() and not l.strip().startswith("#")]
+    return listed + samples
 
 def get_entry_output():
     """Get the output RDS from the entry point script based on workflow."""
@@ -129,6 +179,8 @@ rule basic_analysis:
         dims = config.get("basic", {}).get("dims_use", "1:10"),
         extra = config.get("basic", {}).get("extra_args", "")
     threads: THREADS
+    resources:
+        **rule_resources("basic_analysis")
     log:
         os.path.join(OUTPUT_DIR, "logs", "basic_analysis.log")
     shell:
@@ -162,6 +214,8 @@ rule sctransform:
         vars_to_regress = config.get("sctransform", {}).get("vars_to_regress", ""),
         extra = config.get("sctransform", {}).get("extra_args", "")
     threads: THREADS
+    resources:
+        **rule_resources("sctransform")
     log:
         os.path.join(OUTPUT_DIR, "logs", "sctransform.log")
     run:
@@ -182,6 +236,8 @@ rule sctransform:
 
 rule integration:
     """Run integration analysis (script 03) - entry point for 'integration' workflow."""
+    input:
+        get_integration_input
     output:
         rds = os.path.join(OUTPUT_DIR, "01_integration", "seurat_integrated.rds"),
         markers = os.path.join(OUTPUT_DIR, "01_integration", "cluster_markers_all.csv")
@@ -197,6 +253,8 @@ rule integration:
         conditions = config.get("integration", {}).get("conditions", ""),
         extra = config.get("integration", {}).get("extra_args", "")
     threads: THREADS
+    resources:
+        **rule_resources("integration")
     log:
         os.path.join(OUTPUT_DIR, "logs", "integration.log")
     run:
@@ -244,6 +302,8 @@ rule cell_cycle:
         regress = "--regress_cc" if config.get("cell_cycle", {}).get("regress", False) else "",
         regress_diff = "--regress_cc_difference" if config.get("cell_cycle", {}).get("regress_difference", False) else "",
         extra = config.get("cell_cycle", {}).get("extra_args", "")
+    resources:
+        **rule_resources("cell_cycle")
     log:
         os.path.join(OUTPUT_DIR, "logs", "cell_cycle.log")
     shell:
@@ -289,6 +349,8 @@ rule differential_expression:
         min_pct = config.get("de", {}).get("min_pct", 0.1),
         extra = config.get("de", {}).get("extra_args", "")
     threads: THREADS
+    resources:
+        **rule_resources("differential_expression")
     log:
         os.path.join(OUTPUT_DIR, "logs", "differential_expression.log")
     shell:
@@ -334,6 +396,8 @@ rule visualization:
         reduction = config.get("visualization", {}).get("reduction", "umap"),
         features = config.get("visualization", {}).get("features", ""),
         extra = config.get("visualization", {}).get("extra_args", "")
+    resources:
+        **rule_resources("visualization")
     log:
         os.path.join(OUTPUT_DIR, "logs", "visualization.log")
     run:
@@ -385,6 +449,8 @@ rule sample_level:
         latent_vars = SAMPLE_LEVEL.get("latent_vars", ""),
         extra = SAMPLE_LEVEL.get("extra_args", "")
     threads: THREADS
+    resources:
+        **rule_resources("sample_level")
     log:
         os.path.join(OUTPUT_DIR, "logs", "sample_level.log")
     run:
@@ -430,6 +496,8 @@ rule spatial:
         resolution = SPATIAL.get("resolution", 0.3),
         extra = SPATIAL.get("extra_args", "")
     threads: THREADS
+    resources:
+        **rule_resources("spatial")
     log:
         os.path.join(OUTPUT_DIR, "logs", "spatial.log")
     run:

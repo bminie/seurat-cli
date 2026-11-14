@@ -107,9 +107,11 @@ dependencies:
   # Java (required for Nextflow)
   - openjdk>=11
 
-  # Snakemake cluster executor (from bioconda rather than pip, so conda
-  # keeps its Python deps compatible with snakemake)
+  # Snakemake cluster executors (from bioconda rather than pip, so conda
+  # keeps their Python deps compatible with snakemake). The SLURM one is used
+  # by workflows/snakemake/profiles/slurm.
   - snakemake-executor-plugin-cluster-generic
+  - snakemake-executor-plugin-slurm
 
   # Utilities
   - graphviz  # For DAG visualization

@@ -1,0 +1,46 @@
+# Snakemake profile for SLURM clusters: each rule is a SLURM job running in
+# the seurat-cli container. Needs Snakemake >= 8,
+# snakemake-executor-plugin-slurm (in environment.yml), and Apptainer or
+# Singularity on the compute nodes.
+#
+#   cd workflows/snakemake
+#   snakemake --configfile my_config.yaml --workflow-profile profiles/slurm
+#
+# Run it from a login node; snakemake submits the jobs and waits, so use
+# tmux/screen or submit snakemake itself as a long, low-resource job.
+#
+# Each job asks for the rule's threads (config "threads"), mem_mb, and
+# runtime (config "resources"). Copy this file to change the settings below.
+
+executor: slurm
+jobs: 50                 # most jobs queued or running at once
+software-deployment-method: apptainer
+
+# Where pulled images are kept. Shared storage avoids one ~5 GB copy per run
+# folder. Or set "container" in the config to a local .sif file.
+# apptainer-prefix: "/shared/containers/snakemake"
+
+# Only the working directory is mounted in the container. Bind any folders
+# holding input data (and the sample list's paths) that live elsewhere:
+# apptainer-args: "--bind /data,/scratch"
+
+# Partition and account for every job (or set them per rule in
+# set-resources). Without an account, the plugin uses your default one.
+# default-resources:
+#   slurm_partition: "short"
+#   slurm_account: "myproject"
+
+# Larger jobs on another partition, e.g.:
+# set-resources:
+#   integration:
+#     slurm_partition: "bigmem"
+#     mem_mb: 64000
+
+# The plugin checks jobs with sacct. On clusters without SLURM accounting
+# (sacct reports "accounting storage is disabled"), use squeue instead:
+# slurm-status-command: squeue
+
+latency-wait: 60         # shared filesystems can be slow to show outputs
+retries: 1
+rerun-incomplete: true
+printshellcmds: true

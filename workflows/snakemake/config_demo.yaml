@@ -18,7 +18,11 @@
 # =============================================================================
 
 workflow: "sctransform"
-scripts_dir: "../../scripts"
+
+# Path to the seurat-cli scripts. Leave unset to use this checkout's scripts/
+# folder, or the copy in the image with --sdm apptainer.
+# scripts_dir: "/path/to/seurat-cli/scripts"
+
 output_dir: "demo_results"
 
 # Demo mode - entry-point scripts ignore these and load built-in data
