@@ -349,7 +349,12 @@ seurat_obj <- merge(
 log_message(sprintf("Merged object: %d cells, %d features",
                     ncol(seurat_obj), nrow(seurat_obj)), log_env)
 
-# Split layers by sample for Seurat v5 integration
+# Split layers by sample for Seurat v5 integration. Merging v5 objects
+# already keeps one layer per input (counts.1, counts.2, ...), and split()
+# refuses split layers, so join them first.
+if (inherits(seurat_obj[["RNA"]], "Assay5")) {
+  seurat_obj[["RNA"]] <- JoinLayers(seurat_obj[["RNA"]])
+}
 seurat_obj[["RNA"]] <- split(seurat_obj[["RNA"]], f = seurat_obj$orig.ident)
 
 # QC visualization before integration
