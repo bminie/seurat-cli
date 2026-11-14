@@ -32,11 +32,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `--umap_init` for scripts 01, 02, 03, 05 (RunUMAP `uwot.init`); `--svd_method` for CCA integration in 03; `--threads` for 05
   - `tests/make_xenium_fixture.R` writes a synthetic Xenium folder; the demo tests now cover scripts 01-08
   - Snakemake and Nextflow `sample_level` (03 → 07, or 07 on an existing RDS) and `spatial` (08) workflows; `tests/test_pipelines.sh` runs both in each pipeline
+- HPC support:
+  - `.github/workflows/docker-publish.yml` builds the linux/amd64 image, smoke-tests it, and publishes it as `ghcr.io/bminie/seurat-cli` (`latest` on main, version tags on releases)
+  - Nextflow `apptainer` profile; `--container` (image or local `.sif`), `--queue`, `--cluster_options`, and `--queue_size` for the `slurm` and `pbs` profiles
+  - Snakemake SLURM profile (`workflows/snakemake/profiles/slurm`), per-rule `mem_mb`/`runtime` (`resources` in the config), and a `container` setting; `snakemake-executor-plugin-slurm` added to `environment.yml`
+  - The image caches script 07's demo donor IDs, so every demo runs on compute nodes without internet access
+  - "Running on an HPC Cluster" guide in `workflows/README.md`
 
 ### Changed
 - `tests/run_demo_tests.R` now integrates the validation framework and reports detailed check counts
 - `06_visualization.R` now takes the top `--top_markers` genes per cluster from `--marker_file` (interleaved across clusters) instead of every gene in the file
 - Nextflow pipeline requires Nextflow >= 24.04; resource caps use the built-in `resourceLimits` instead of a custom `check_max` function
+- Pipeline containers use `ghcr.io/bminie/seurat-cli` instead of the never-published `bminie/seurat-cli`
+- Nextflow `slurm` and `pbs` profiles no longer override every process with 4 CPUs / 16 GB / 4 h, so each process keeps its own resources, and no longer hard-code a placeholder queue and account
+- Sample lists (`--input_list`) skip `#` comment lines
+- Snakemake finds the scripts relative to the Snakefile, not the launch directory
 - Snakemake demo config only passes `--demo` to entry-point steps, so downstream steps use upstream outputs; demo can now run the `basic` and `integration` workflows
 - Conda environments: removed `bioconductor-batchelor` (no osx-arm64 build), install presto from bioconda, add `r-remotes`, drop the `defaults` channel, require Snakemake >= 8 and Nextflow >= 24.04
 - Snakemake container docs use `--sdm apptainer` (Snakemake >= 8) instead of the removed `--use-singularity`
@@ -46,6 +56,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `setup.R` installs ComplexHeatmap and destiny by default and the spatial readers with `--all`; it installs destiny 3.26 from Bioconductor 3.23 when the older release can't install (its `smoother` dependency was archived on CRAN), and sets a CRAN mirror when none is configured
 
 ### Fixed
+- Nextflow integration and sample-level runs only passed the sample list file to the task, not the samples in it, so the `docker`/`singularity` profiles couldn't read them. Each listed sample is now staged into the task
+- Snakemake `--sdm apptainer` looked for the scripts at `../../scripts`, which isn't mounted in the container; container runs now use `/app/scripts`
+- Snakemake rules declared no memory or time, so cluster executors submitted every job with the cluster's defaults
 - `03_integration.R` failed with more than one input file: merging Seurat v5 objects already splits the counts by input, and splitting again errored. Layers are now joined before splitting by sample (the demo, which starts from one object, was unaffected)
 - Snakemake pipeline silently ran the `basic` workflow for an unknown `workflow` name; it now stops with the list of workflows
 - Nextflow pipeline failed to start on Nextflow >= 26 (strict syntax parser): moved top-level `--help`/input checks into the workflow and removed the function from `nextflow.config`

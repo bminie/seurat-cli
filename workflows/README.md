@@ -165,11 +165,11 @@ nextflow run main.nf --input /path/to/data --workflow sctransform
 # Run with Docker
 nextflow run main.nf --demo -profile docker
 
-# Run with Singularity (HPC clusters)
-nextflow run main.nf --demo -profile singularity
+# Run with Apptainer or Singularity
+nextflow run main.nf --demo -profile apptainer
 
-# Run on SLURM cluster with Singularity
-nextflow run main.nf --input /path/to/data -profile slurm,singularity
+# Run on a SLURM cluster with Apptainer (see "Running on an HPC cluster")
+nextflow run main.nf --input /path/to/data -profile slurm,apptainer
 
 # Run demo test
 nextflow run main.nf -profile test
@@ -199,7 +199,9 @@ nextflow run main.nf \
 
 ### Multi-Sample (integration)
 
-Create a text file with paths to each sample (one per line):
+Create a text file with paths to each sample (one per line; blank lines and
+lines starting with `#` are skipped). Use absolute paths, or paths relative to
+the directory you launch the pipeline from:
 
 ```
 # samples.txt
@@ -207,6 +209,11 @@ Create a text file with paths to each sample (one per line):
 /path/to/sample2
 /path/to/sample3
 ```
+
+Nextflow stages each listed sample into the integration task (as
+`sample1/`, `sample2/`, ...), so samples with the same file name are fine and
+containers can read them. Snakemake checks that every listed sample exists
+before it starts.
 
 Then use:
 - Snakemake: Set `input_list: "samples.txt"` in config
@@ -269,7 +276,9 @@ results/
 
 ## Container Support
 
-Both pipelines support running in Docker or Singularity containers, which ensures reproducibility and simplifies dependency management.
+Both pipelines can run every step in the `ghcr.io/bminie/seurat-cli` image
+(linux/amd64), which has all R packages, the scripts (`/app/scripts`), and the
+demo datasets.
 
 ### Nextflow with Containers
 
@@ -277,33 +286,112 @@ Both pipelines support running in Docker or Singularity containers, which ensure
 # Docker (local development)
 nextflow run main.nf --demo -profile docker
 
-# Singularity (HPC clusters)
+# Apptainer or Singularity (HPC)
+nextflow run main.nf --demo -profile apptainer
 nextflow run main.nf --demo -profile singularity
 
-# SLURM + Singularity
-nextflow run main.nf --input /path/to/data -profile slurm,singularity
+# A different image, or a local .sif file
+nextflow run main.nf --demo -profile apptainer --container /shared/seurat-cli.sif
 ```
 
 ### Snakemake with Containers
 
 ```bash
-# With Apptainer/Singularity (recommended for HPC; Snakemake >= 8)
+# Apptainer/Singularity (Snakemake >= 8). Rules use the scripts in the image.
 snakemake --configfile config.yaml --cores 4 --sdm apptainer
 
-# Singularity will automatically pull the Docker image:
-# docker://bminie/seurat-cli:latest
+# Only the working directory is mounted in the container; bind data elsewhere
+snakemake --configfile config.yaml --cores 4 --sdm apptainer \
+    --apptainer-args "--bind /data"
 ```
+
+Set `container` in the config to use a different image or a local `.sif` file.
 
 ### Building the Container Locally
 
 ```bash
-# From the project root. The Nextflow docker profile uses bminie/seurat-cli:latest,
-# which is not on Docker Hub yet, so build it under that name.
-docker build -t seurat-cli -t bminie/seurat-cli:latest .
+# From the project root
+docker build -t seurat-cli .
 
-# Convert to Singularity (optional)
-singularity build seurat-cli.sif docker-daemon://seurat-cli:latest
+# Use it with the Nextflow docker profile
+nextflow run main.nf --demo -profile docker --container seurat-cli
+
+# Convert to a .sif file for Apptainer/Singularity
+apptainer build seurat-cli.sif docker-daemon://seurat-cli:latest
 ```
+
+## Running on an HPC Cluster
+
+Run the pipeline from a login node (in `tmux`/`screen`, or as a long
+low-resource job). It submits each step as its own cluster job, and each job
+runs in the container through Apptainer or Singularity. Each step asks for its
+own memory and time: 16 GB / 4 h for integration, sample-level, and spatial,
+6-8 GB for the rest, and `threads` CPUs.
+
+### Get the image onto the cluster
+
+The pipelines pull the image on first use. Pull it once to shared storage
+instead, which is faster and works when compute nodes have no internet access:
+
+```bash
+apptainer pull /shared/containers/seurat-cli.sif docker://ghcr.io/bminie/seurat-cli:latest
+```
+
+Then pass `--container /shared/containers/seurat-cli.sif` (Nextflow) or set
+`container: /shared/containers/seurat-cli.sif` in the Snakemake config. To let
+Nextflow pull it, set `NXF_APPTAINER_CACHEDIR` (or `NXF_SINGULARITY_CACHEDIR`)
+to shared storage so runs reuse one copy.
+
+### Nextflow (SLURM or PBS)
+
+```bash
+cd workflows/nextflow
+nextflow run main.nf -profile slurm,apptainer \
+    --input_list samples.txt --workflow integration \
+    --container /shared/containers/seurat-cli.sif \
+    --queue short --cluster_options="--account=mylab"
+```
+
+- `slurm` or `pbs`, plus `apptainer` or `singularity`
+- `--queue`: partition/queue (default: the scheduler's default)
+- `--cluster_options`: extra submit options. Write it with `=`; otherwise
+  Nextflow reads a value starting with `--` as a separate flag.
+- `--max_memory`, `--max_cpus`, `--max_time`: caps for any one job (default
+  16 GB, 8, 24 h). Raise them for large datasets, e.g. `--max_memory 64.GB`.
+- `--queue_size`: most jobs queued or running at once (default 50)
+
+Nextflow mounts input files into the container itself.
+
+### Snakemake (SLURM)
+
+Needs `snakemake-executor-plugin-slurm` (in `environment.yml`):
+
+```bash
+cd workflows/snakemake
+snakemake --configfile my_config.yaml --workflow-profile profiles/slurm \
+    --apptainer-args "--bind /data,/scratch"
+```
+
+`profiles/slurm/config.yaml` runs every rule as a SLURM job in the container;
+copy it to set your partition, account, binds, and image cache folder. Memory
+and time per rule come from `resources` in the config:
+
+```yaml
+container: /shared/containers/seurat-cli.sif
+threads: 8
+resources:
+  default: {mem_mb: 16000, runtime: 240}
+  integration: {mem_mb: 64000, runtime: 480}
+```
+
+Bind every folder outside the working directory that holds input data or
+paths from the sample list (`--apptainer-args "--bind ..."`). If `sacct`
+reports that accounting is disabled on your cluster, add
+`--slurm-status-command squeue`.
+
+For other schedulers (LSF, SGE, ...), set the matching Nextflow executor in a
+config file passed with `-c` (`process.executor = 'lsf'`), or use the matching
+Snakemake executor plugin.
 
 ## Testing
 

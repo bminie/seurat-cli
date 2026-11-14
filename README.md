@@ -100,11 +100,17 @@ Or open in RStudio by double-clicking `seurat-cli.Rproj`.
 
 ### Option 3: Docker
 
-Run without installing any dependencies:
+Run without installing any dependencies. The published image is
+`ghcr.io/bminie/seurat-cli` (linux/amd64, built by
+`.github/workflows/docker-publish.yml`); the pipelines' container profiles use it.
 
 ```bash
-# Build the image (the second tag is the name the Nextflow docker profile uses)
-docker build -t seurat-cli -t bminie/seurat-cli:latest .
+# Pull the published image
+docker pull ghcr.io/bminie/seurat-cli:latest
+docker tag ghcr.io/bminie/seurat-cli:latest seurat-cli
+
+# Or build it yourself
+docker build -t seurat-cli .
 
 # On Apple Silicon, build an amd64 image for x86-64 Linux/HPC machines instead.
 # Takes ~15 min: Bioconductor packages compile from source under emulation.
@@ -138,34 +144,38 @@ docker run --rm -v $(pwd)/output:/output seurat-cli bash -c "\
     --output /output/03_viz"
 ```
 
-**Singularity (for HPC clusters):**
+**Apptainer/Singularity (for HPC clusters):**
 ```bash
-# Pull from Docker Hub (after image is published)
-singularity pull docker://bminie/seurat-cli:latest
+# Pull once into a .sif file (works with `singularity` in place of `apptainer`)
+apptainer pull seurat-cli.sif docker://ghcr.io/bminie/seurat-cli:latest
 
 # Run a single script
-singularity exec seurat-cli_latest.sif \
+apptainer exec seurat-cli.sif \
   Rscript /app/scripts/01_basic_analysis.R --demo --output ./output
 
 # Run with your data
-singularity exec --bind /path/to/data:/data,./output:/output seurat-cli_latest.sif \
+apptainer exec --bind /path/to/data:/data,./output:/output seurat-cli.sif \
   Rscript /app/scripts/01_basic_analysis.R --input /data --output /output
 ```
 
+The demo datasets are in the image, so demos run on compute nodes without
+internet access.
+
 **Use with workflow pipelines:**
 
-> The image is not on Docker Hub yet. Build it locally first (see above) so the
-> Nextflow `docker` profile can find `bminie/seurat-cli:latest`. The `singularity`
-> profile and Snakemake `--sdm apptainer` pull from Docker Hub, so they need the
-> image to be published.
+The `docker`, `singularity`, and `apptainer` profiles (Nextflow) and
+`--sdm apptainer` (Snakemake) use `ghcr.io/bminie/seurat-cli:latest`. To use
+another image, pass `--container seurat-cli` (Nextflow) or set `container` in
+the Snakemake config; a local `.sif` file also works. For SLURM and PBS
+clusters, see [Running on an HPC cluster](workflows/README.md#running-on-an-hpc-cluster).
 
 ```bash
 # Nextflow with Docker
 cd workflows/nextflow
 nextflow run main.nf --demo -profile docker
 
-# Nextflow with Singularity (HPC)
-nextflow run main.nf --demo -profile singularity
+# Nextflow on a SLURM cluster with Apptainer
+nextflow run main.nf --demo -profile slurm,apptainer
 
 # Snakemake with Apptainer/Singularity
 cd workflows/snakemake
