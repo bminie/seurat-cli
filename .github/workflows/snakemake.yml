@@ -51,6 +51,11 @@ jobs:
           cd workflows/snakemake
           snakemake --configfile config_demo.yaml --dry-run --printshellcmds
 
+      - name: Dry run the sample_level demo
+        run: |
+          cd workflows/snakemake
+          snakemake --configfile config_demo.yaml --config workflow=sample_level --dry-run
+
       - name: Validate DAG generation
         run: |
           cd workflows/snakemake

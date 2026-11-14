@@ -685,6 +685,98 @@ test_nextflow_full() {
 }
 
 # -----------------------------------------------------------------------------
+# Seurat 6 Workflows (sample_level, spatial)
+# -----------------------------------------------------------------------------
+
+# Check that files exist under a base directory; prints one line per file
+check_outputs() {
+    local base="$1"
+    shift
+    local all_found=true
+    for f in "$@"; do
+        if [[ -f "${base}/${f}" ]]; then
+            echo -e "    ${GREEN}✓${NC} ${f}"
+        else
+            echo -e "    ${RED}✗${NC} ${f} (not found)"
+            all_found=false
+        fi
+    done
+    $all_found
+}
+
+# Write the synthetic Xenium folder used by the spatial workflow tests
+make_xenium_fixture() {
+    local dir="$1"
+    rm -rf "$dir"
+    run_in_env "$PKG_MANAGER" "Rscript '${PROJECT_DIR}/tests/make_xenium_fixture.R' '${dir}'"
+}
+
+test_snakemake_new_workflows() {
+    echo -e "${YELLOW}Snakemake sample_level and spatial workflows...${NC}"
+
+    local fixture="${SNAKEMAKE_OUTPUT}/xenium_fixture"
+    make_xenium_fixture "$fixture" || return 1
+
+    cat > "${SNAKEMAKE_OUTPUT}/new_workflows.yaml" << EOF
+scripts_dir: "${PROJECT_DIR}/scripts"
+output_dir: "${SNAKEMAKE_OUTPUT}/results"
+input_path: "${fixture}"
+threads: 2
+
+# Script 07 demo: ifnb with donor IDs
+sample_level:
+  input_rds: "DEMO"
+  extra_args: "--demo"
+
+spatial:
+  molecules: "GeneA1,GeneB1"
+  crop: "80,130,80,130"
+EOF
+
+    local base="cd '${PROJECT_DIR}/workflows/snakemake' && snakemake --configfile '${SNAKEMAKE_OUTPUT}/new_workflows.yaml' --cores 2"
+    for wf in sample_level spatial; do
+        echo "  Running workflow=${wf}..."
+        if ! run_in_env "$PKG_MANAGER" "$base --config workflow=${wf}"; then
+            echo -e "  ${RED}✗ ${wf} workflow failed${NC}"
+            return 1
+        fi
+    done
+
+    echo "  Checking outputs..."
+    check_outputs "$SNAKEMAKE_OUTPUT" \
+        "results/sample_level/traj_de_summary.csv" \
+        "results/sample_level/sample_embedding.csv" \
+        "results/spatial/cluster_assignments.csv" \
+        "results/spatial/08_zoom.png"
+}
+
+test_nextflow_new_workflows() {
+    echo -e "${YELLOW}Nextflow sample_level and spatial workflows...${NC}"
+
+    local fixture="${NEXTFLOW_OUTPUT}/xenium_fixture"
+    make_xenium_fixture "$fixture" || return 1
+
+    local base="cd '${PROJECT_DIR}/workflows/nextflow' && nextflow run main.nf -profile test --outdir '${NEXTFLOW_OUTPUT}/results'"
+    echo "  Running --workflow sample_level..."
+    if ! run_in_env "$PKG_MANAGER" "$base --workflow sample_level"; then
+        echo -e "  ${RED}✗ sample_level workflow failed${NC}"
+        return 1
+    fi
+    echo "  Running --workflow spatial..."
+    if ! run_in_env "$PKG_MANAGER" "$base --workflow spatial --input '${fixture}' --sp_molecules GeneA1,GeneB1 --sp_crop 80,130,80,130"; then
+        echo -e "  ${RED}✗ spatial workflow failed${NC}"
+        return 1
+    fi
+
+    echo "  Checking outputs..."
+    check_outputs "$NEXTFLOW_OUTPUT" \
+        "results/sample_level/traj_de_summary.csv" \
+        "results/sample_level/sample_embedding.csv" \
+        "results/spatial/cluster_assignments.csv" \
+        "results/spatial/08_zoom.png"
+}
+
+# -----------------------------------------------------------------------------
 # Main
 # -----------------------------------------------------------------------------
 
@@ -749,11 +841,13 @@ else
 
     if [[ "$TEST_TARGET" == "snakemake" || "$TEST_TARGET" == "both" ]]; then
         test_snakemake_full || SNAKEMAKE_RESULT=1
+        test_snakemake_new_workflows || SNAKEMAKE_RESULT=1
         echo ""
     fi
 
     if [[ "$TEST_TARGET" == "nextflow" || "$TEST_TARGET" == "both" ]]; then
         test_nextflow_full || NEXTFLOW_RESULT=1
+        test_nextflow_new_workflows || NEXTFLOW_RESULT=1
         echo ""
     fi
 fi
