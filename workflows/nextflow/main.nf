@@ -92,6 +92,27 @@ params.sp_normalization = "SCT"
 params.sp_resolution = 0.3
 
 // -----------------------------------------------------------------------------
+// True/false options
+// -----------------------------------------------------------------------------
+
+// Nextflow passes command-line values as text, so "--demo false" arrives as
+// the string "false", which Groovy treats as true. Read these options with
+// isTrue() instead of using them directly.
+def isTrue(value) {
+    if (value instanceof Boolean) {
+        return value
+    }
+    return value?.toString()?.trim()?.toLowerCase() in ['true', 'yes', '1']
+}
+
+def isBooleanText(value) {
+    if (value == null || value instanceof Boolean) {
+        return true
+    }
+    return value.toString().trim().toLowerCase() in ['true', 'false', 'yes', 'no', '1', '0']
+}
+
+// -----------------------------------------------------------------------------
 // Help Message
 // -----------------------------------------------------------------------------
 
@@ -187,8 +208,8 @@ process BASIC_ANALYSIS {
     path "*.txt"
 
     script:
-    def demo_flag = params.demo ? "--demo" : ""
-    def input_arg = params.demo ? "" : "--input ${input_data}"
+    def demo_flag = isTrue(params.demo) ? "--demo" : ""
+    def input_arg = isTrue(params.demo) ? "" : "--input ${input_data}"
     """
     Rscript ${params.scripts_dir}/01_basic_analysis.R \
         ${input_arg} \
@@ -219,8 +240,8 @@ process SCTRANSFORM {
     path "*.txt"
 
     script:
-    def demo_flag = params.demo ? "--demo" : ""
-    def input_arg = params.demo ? "" : "--input ${input_data}"
+    def demo_flag = isTrue(params.demo) ? "--demo" : ""
+    def input_arg = isTrue(params.demo) ? "" : "--input ${input_data}"
     def vars_regress = params.sct_vars_to_regress ? "--vars_to_regress \"${params.sct_vars_to_regress}\"" : ""
     """
     Rscript ${params.scripts_dir}/02_sctransform.R \
@@ -253,10 +274,10 @@ process INTEGRATION {
     path "*.txt"
 
     script:
-    def demo_flag = params.demo ? "--demo" : ""
-    def input_arg = params.demo ? "" : "--input_list samples.txt"
+    def demo_flag = isTrue(params.demo) ? "--demo" : ""
+    def input_arg = isTrue(params.demo) ? "" : "--input_list samples.txt"
     def sample_paths = (samples instanceof List ? samples : [samples]).collect { p -> "'${p}'" }
-    def write_list = params.demo ? "" : "printf '%s\\n' ${sample_paths.join(' ')} > samples.txt"
+    def write_list = isTrue(params.demo) ? "" : "printf '%s\\n' ${sample_paths.join(' ')} > samples.txt"
     def sample_names = params.int_sample_names ? "--sample_names \"${params.int_sample_names}\"" : ""
     def conditions = params.int_conditions ? "--conditions \"${params.int_conditions}\"" : ""
     """
@@ -291,8 +312,8 @@ process CELL_CYCLE {
     path "*.txt"
 
     script:
-    def regress_flag = params.cc_regress ? "--regress_cc" : ""
-    def regress_diff_flag = params.cc_regress_difference ? "--regress_cc_difference" : ""
+    def regress_flag = isTrue(params.cc_regress) ? "--regress_cc" : ""
+    def regress_diff_flag = isTrue(params.cc_regress_difference) ? "--regress_cc_difference" : ""
     """
     Rscript ${params.scripts_dir}/05_cell_cycle.R \
         --input ${seurat_rds} \
@@ -373,7 +394,7 @@ process SAMPLE_LEVEL {
 
     script:
     // In demo mode the script loads ifnb with donor IDs and sets its own columns
-    def input_arg = params.demo ? "--demo" : "--input ${seurat_rds}"
+    def input_arg = isTrue(params.demo) ? "--demo" : "--input ${seurat_rds}"
     def celltype_arg = params.sl_celltype_col ? "--celltype_col \"${params.sl_celltype_col}\"" : ""
     def latent_arg = params.sl_latent_vars ? "--latent_vars \"${params.sl_latent_vars}\"" : ""
     """
@@ -510,7 +531,7 @@ workflow SAMPLE_LEVEL_WORKFLOW {
     // The demo and --sl_input_rds start from an existing object; otherwise
     // integrate the samples first
     def rds_ch = input_ch
-    if (!params.demo && !params.sl_input_rds) {
+    if (!isTrue(params.demo) && !params.sl_input_rds) {
         INTEGRATION(input_ch)
         rds_ch = INTEGRATION.out.rds
     }
@@ -536,13 +557,20 @@ workflow SPATIAL_WORKFLOW {
 // -----------------------------------------------------------------------------
 
 workflow {
-    if (params.help) {
+    // Reject values such as "--demo flase" rather than reading them as false
+    def bad_flags = ['help', 'demo', 'cc_regress', 'cc_regress_difference'].findAll { name -> !isBooleanText(params[name]) }
+    if (bad_flags) {
+        log.error "Error: ${bad_flags.collect { name -> "--${name}" }.join(', ')} must be true or false (got ${bad_flags.collect { name -> params[name] }.join(', ')})"
+        exit 1
+    }
+
+    if (isTrue(params.help)) {
         helpMessage()
         exit 0
     }
 
     // Validate inputs
-    if (!params.demo && !params.input && !params.input_list && !params.sl_input_rds &&
+    if (!isTrue(params.demo) && !params.input && !params.input_list && !params.sl_input_rds &&
         params.workflow != "spatial") {
         helpMessage()
         log.error "Error: --input or --input_list is required (or use --demo)"
@@ -565,7 +593,7 @@ workflow {
     // Create input channel
     if (params.workflow == "spatial") {
         input_ch = channel.of(file(params.input, checkIfExists: true))
-    } else if (params.demo) {
+    } else if (isTrue(params.demo)) {
         input_ch = channel.of(file("${projectDir}/dummy_input"))
     } else if (params.workflow == "sample_level" && params.sl_input_rds) {
         input_ch = channel.fromPath(params.sl_input_rds, checkIfExists: true)
