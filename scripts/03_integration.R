@@ -248,8 +248,9 @@ if (args$demo) {
 } else {
   # Parse input list
   if (file.exists(args$input_list)) {
-    input_paths <- readLines(args$input_list)
-    input_paths <- input_paths[nchar(trimws(input_paths)) > 0]
+    # One path per line; blank lines and # comments are skipped
+    input_paths <- trimws(readLines(args$input_list))
+    input_paths <- input_paths[nchar(input_paths) > 0 & !startsWith(input_paths, "#")]
   } else {
     input_paths <- trimws(strsplit(args$input_list, ",")[[1]])
   }

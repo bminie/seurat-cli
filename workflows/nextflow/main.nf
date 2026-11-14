@@ -152,6 +152,18 @@ def helpMessage() {
       # Xenium or Atera data
       nextflow run main.nf --input xenium_outs --workflow spatial --sp_molecules Gad1,Sst
 
+    HPC (profiles: slurm or pbs, plus singularity or apptainer):
+      --queue           Partition/queue (default: scheduler default)
+      --cluster_options Extra submit options; write it with "=" so the value
+                        isn't read as a flag: --cluster_options="--account=lab"
+      --container       Image, or a local .sif file for offline compute nodes
+                        (default: ghcr.io/bminie/seurat-cli:latest)
+      --max_memory, --max_cpus, --max_time
+                        Per-task caps (default: 16.GB, 8, 24.h)
+
+      nextflow run main.nf -profile slurm,apptainer --input_list samples.txt \\
+          --workflow integration --cluster_options="--account=lab"
+
     =============================================================================
     """.stripIndent()
 }
@@ -229,7 +241,9 @@ process INTEGRATION {
     publishDir "${params.outdir}/01_integration", mode: 'copy'
 
     input:
-    path input_list
+    // The samples from --input_list, staged into the task directory so they
+    // are readable inside containers and on any cluster node
+    path samples, stageAs: 'sample*/*'
 
     output:
     path "seurat_integrated.rds", emit: rds
@@ -240,10 +254,13 @@ process INTEGRATION {
 
     script:
     def demo_flag = params.demo ? "--demo" : ""
-    def input_arg = params.demo ? "" : "--input_list ${input_list}"
+    def input_arg = params.demo ? "" : "--input_list samples.txt"
+    def sample_paths = (samples instanceof List ? samples : [samples]).collect { p -> "'${p}'" }
+    def write_list = params.demo ? "" : "printf '%s\\n' ${sample_paths.join(' ')} > samples.txt"
     def sample_names = params.int_sample_names ? "--sample_names \"${params.int_sample_names}\"" : ""
     def conditions = params.int_conditions ? "--conditions \"${params.int_conditions}\"" : ""
     """
+    ${write_list}
     Rscript ${params.scripts_dir}/03_integration.R \
         ${input_arg} \
         --output . \
@@ -538,6 +555,13 @@ workflow {
         exit 1
     }
 
+    // "--cluster_options --account=x" (no "=") leaves the option without a
+    // value, which Nextflow sets to true (or "true")
+    if (params.cluster_options in [true, 'true']) {
+        log.error 'Error: --cluster_options has no value. Write it with "=", e.g. --cluster_options="--account=lab"'
+        exit 1
+    }
+
     // Create input channel
     if (params.workflow == "spatial") {
         input_ch = channel.of(file(params.input, checkIfExists: true))
@@ -546,7 +570,18 @@ workflow {
     } else if (params.workflow == "sample_level" && params.sl_input_rds) {
         input_ch = channel.fromPath(params.sl_input_rds, checkIfExists: true)
     } else if (params.workflow in ["integration", "sample_level"]) {
-        input_ch = channel.fromPath(params.input_list)
+        if (!params.input_list) {
+            log.error "Error: the ${params.workflow} workflow needs --input_list (or --demo)"
+            exit 1
+        }
+        // One path per line (absolute, or relative to the launch directory);
+        // blank lines and # comments are skipped. All samples go to one task.
+        input_ch = channel.fromPath(params.input_list, checkIfExists: true)
+            .splitText()
+            .map { line -> line.trim() }
+            .filter { line -> line && !line.startsWith('#') }
+            .map { line -> file(line, checkIfExists: true) }
+            .collect()
     } else {
         input_ch = channel.fromPath(params.input)
     }
