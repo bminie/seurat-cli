@@ -91,6 +91,8 @@ Both pipelines support the following workflow types:
 | `integration` | 03 → 04 → 06 | Multi-sample integration |
 | `cell_cycle` | 02 → 05 → 04 → 06 | SCTransform with cell cycle scoring |
 | `full` | 02 → 05 → 04 → 06 | Complete analysis with cell cycle |
+| `sample_level` | 03 → 07 | scSLIDE sample-level analysis of integrated samples (or 07 alone on an existing RDS) |
+| `spatial` | 08 | Xenium/Atera imaging data (input is the output folder; no demo) |
 
 **Script Legend:**
 - 01: Basic Analysis
@@ -99,6 +101,8 @@ Both pipelines support the following workflow types:
 - 04: Differential Expression
 - 05: Cell Cycle
 - 06: Visualization
+- 07: Sample-Level Analysis (scSLIDE)
+- 08: Imaging Spatial (Xenium/Atera)
 
 ## Snakemake
 
@@ -208,6 +212,27 @@ Then use:
 - Snakemake: Set `input_list: "samples.txt"` in config
 - Nextflow: `--input_list samples.txt --workflow integration`
 
+### Sample-Level Analysis (sample_level)
+
+Runs integration and then `07_sample_level.R` on the integrated object. Each
+sample in the list is one sample (e.g. donor) for scSLIDE, and the integration
+conditions are the response, so set them (`integration.conditions` /
+`--int_conditions`). At least 4 samples are needed, ideally 10 or more. By
+default cell types are the integration clusters; change `sample_level.celltype_col`
+(`--sl_celltype_col`) if the object has annotations.
+
+To analyze an existing Seurat object instead, set `sample_level.input_rds`
+(`--sl_input_rds`) and the column names (`sample_col`, `response`, ...). The demo
+(`config_demo.yaml` with `workflow=sample_level`, or `-profile demo --workflow
+sample_level`) runs script 07's own demo: ifnb with donor IDs, 16 samples.
+
+### Imaging Spatial Data (spatial)
+
+Set the input to a 10x Xenium or Atera output folder (`input_path` /
+`--input`). Options are under `spatial` (`--sp_*`): `molecules`, `crop`,
+`normalization`, `resolution`, `platform`. There is no demo dataset; the pipeline
+tests use the synthetic folder from `tests/make_xenium_fixture.R`.
+
 ## Output Structure
 
 Both pipelines create similar output structures:
@@ -226,6 +251,14 @@ results/
 │   └── de_results_significant.csv
 ├── visualization/
 │   ├── visualization_summary.md
+│   └── *.png
+├── sample_level/            # sample_level workflow
+│   ├── traj_de_summary.csv
+│   ├── sample_embedding.csv
+│   └── *.png
+├── spatial/                 # spatial workflow
+│   ├── seurat_spatial.rds
+│   ├── cluster_assignments.csv
 │   └── *.png
 ├── logs/                    # Snakemake only
 └── pipeline_info/           # Nextflow only

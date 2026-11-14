@@ -626,6 +626,8 @@ For automated, reproducible analyses, use the included **Snakemake** or **Nextfl
 | `integration` | 03 → 04 → 06 | Multi-sample integration |
 | `cell_cycle` | 02 → 05 → 04 → 06 | SCTransform with cell cycle scoring |
 | `full` | 02 → 05 → 04 → 06 | Complete analysis with cell cycle |
+| `sample_level` | 03 → 07 | scSLIDE sample-level analysis of integrated samples (or 07 alone on an existing RDS) |
+| `spatial` | 08 | Xenium/Atera imaging data (input is the output folder; no demo) |
 
 ### Snakemake
 
@@ -653,6 +655,13 @@ nextflow run main.nf --demo --outdir demo_results
 
 # Run specific workflow
 nextflow run main.nf --input /path/to/data --workflow full
+
+# Sample-level analysis (>= 4 samples; --int_conditions gives the response)
+nextflow run main.nf --input_list samples.txt --int_conditions "ctrl,ctrl,stim,stim" \
+  --workflow sample_level
+
+# Xenium or Atera data
+nextflow run main.nf --input /path/to/xenium_outs --workflow spatial
 
 # Run with Docker
 nextflow run main.nf --input /path/to/data -profile docker

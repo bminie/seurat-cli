@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Pseudobulk heatmap in `04_differential_expression.R --pseudobulk` (`PlotAnnotatedHeatmap`)
   - `--umap_init` for scripts 01, 02, 03, 05 (RunUMAP `uwot.init`); `--svd_method` for CCA integration in 03; `--threads` for 05
   - `tests/make_xenium_fixture.R` writes a synthetic Xenium folder; the demo tests now cover scripts 01-08
+  - Snakemake and Nextflow `sample_level` (03 → 07, or 07 on an existing RDS) and `spatial` (08) workflows; `tests/test_pipelines.sh` runs both in each pipeline
 
 ### Changed
 - `tests/run_demo_tests.R` now integrates the validation framework and reports detailed check counts
@@ -45,6 +46,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `setup.R` installs ComplexHeatmap and destiny by default and the spatial readers with `--all`; it installs destiny 3.26 from Bioconductor 3.23 when the older release can't install (its `smoother` dependency was archived on CRAN), and sets a CRAN mirror when none is configured
 
 ### Fixed
+- `03_integration.R` failed with more than one input file: merging Seurat v5 objects already splits the counts by input, and splitting again errored. Layers are now joined before splitting by sample (the demo, which starts from one object, was unaffected)
+- Snakemake pipeline silently ran the `basic` workflow for an unknown `workflow` name; it now stops with the list of workflows
 - Nextflow pipeline failed to start on Nextflow >= 26 (strict syntax parser): moved top-level `--help`/input checks into the workflow and removed the function from `nextflow.config`
 - `max_memory`, `max_cpus`, and `max_time` were never applied (the old `check_max` helper always fell back to the default)
 - Nextflow `test` profile resource settings were overridden by the main `process` block; profiles now take precedence
