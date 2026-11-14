@@ -16,8 +16,9 @@
 # Interactive:
 #   docker run --rm -it -v $(pwd):/work seurat-cli bash
 #
-# Singularity (pull from Docker Hub after pushing):
-#   singularity pull docker://bminie/seurat-cli:latest
+# Published image (linux/amd64, built by .github/workflows/docker-publish.yml):
+#   docker pull ghcr.io/bminie/seurat-cli:latest
+#   apptainer pull seurat-cli.sif docker://ghcr.io/bminie/seurat-cli:latest
 #
 # =============================================================================
 
@@ -147,6 +148,20 @@ COPY tests/ /app/tests/
 
 # Make scripts accessible from PATH
 ENV PATH="/app/scripts:${PATH}"
+
+# Files the scripts would otherwise download on first use (script 07's ifnb
+# donor IDs), so the demos also run on compute nodes without internet access.
+# World-readable, since HPC and the Nextflow docker profile run tasks as the
+# host user.
+ENV SEURAT_CLI_CACHE=/opt/seurat-cli/cache
+RUN Rscript -e "source('/app/utils/common.R'); invisible(fetch_ifnb_donor_files())" \
+    && chmod -R a+rX /opt/seurat-cli
+
+# Don't load R packages from the user's home library. Apptainer/Singularity
+# mount the host home directory, where packages built for the host's R would
+# otherwise be loaded ahead of the image's. The directory doesn't exist, so R
+# skips it.
+ENV R_LIBS_USER=/opt/seurat-cli/no-user-library
 
 # Set default command
 CMD ["Rscript", "--help"]

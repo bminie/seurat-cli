@@ -1,0 +1,106 @@
+name: Docker Image
+
+# Builds the linux/amd64 image that the pipelines' container modes use
+# (Nextflow docker/singularity/apptainer profiles, Snakemake --sdm apptainer),
+# smoke-tests it, and publishes it to GitHub Container Registry as
+# ghcr.io/<owner>/seurat-cli. Pull requests build and test without pushing.
+#
+# Tags: "latest" for main, "1.2.3" and "1.2" for v1.2.3 release tags, and
+# "sha-<commit>" for every published build.
+#
+# The first push creates a private package. Make it public once (package
+# settings on GitHub) so clusters can pull it without logging in.
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+    # Path filters don't apply to tag pushes, so releases always build
+    paths:
+      - Dockerfile
+      - scripts/**
+      - utils/**
+      - tests/**
+      - .github/workflows/docker-publish.yml
+  pull_request:
+    branches: [main]
+    paths:
+      - Dockerfile
+      - scripts/**
+      - utils/**
+      - tests/**
+      - .github/workflows/docker-publish.yml
+  workflow_dispatch:
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  image:
+    name: Build, test, and publish (linux/amd64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # The image is ~5 GB and is held twice (build cache and loaded copy)
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Image tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/seurat-cli
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,format=short
+
+      - name: Build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: seurat-cli:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Run as a non-root user, as HPC and the Nextflow docker profile do
+      - name: Smoke test
+        run: |
+          docker run --rm -u 1001:1001 -e HOME=/tmp seurat-cli:test \
+            Rscript -e 'cat("Seurat", as.character(packageVersion("Seurat")), "\n")'
+          docker run --rm -u 1001:1001 -e HOME=/tmp seurat-cli:test \
+            Rscript /app/scripts/01_basic_analysis.R --demo --output /tmp/smoke
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Reuses the layers from the build step
+      - name: Publish
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha

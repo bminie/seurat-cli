@@ -153,6 +153,19 @@ cached_download <- function(url, filename = basename(url)) {
   path
 }
 
+#' Download (or reuse) the ifnb demuxlet donor calls
+#'
+#' The Docker image runs this at build time, so the sample-level demo also
+#' works on compute nodes without internet access.
+#'
+#' @return Paths to the cached ctrl and stim call files
+fetch_ifnb_donor_files <- function() {
+  base_url <- "https://raw.githubusercontent.com/yelabucsf/demuxlet_paper_code/master/fig3/"
+  files <- c("ye1.ctrl.8.10.sm.best", "ye2.stim.8.10.sm.best")
+  vapply(files, function(f) cached_download(paste0(base_url, f)), character(1),
+         USE.NAMES = FALSE)
+}
+
 #' Add donor IDs to the ifnb demo dataset
 #'
 #' ifnb pools cells from 8 donors per condition. Donor identities come from
@@ -164,12 +177,8 @@ cached_download <- function(url, filename = basename(url)) {
 #' @param ifnb ifnb Seurat object from load_demo_dataset("ifnb")
 #' @return ifnb with a donor_id column, subset to cells with a donor ID
 add_ifnb_donor_ids <- function(ifnb) {
-  base_url <- "https://raw.githubusercontent.com/yelabucsf/demuxlet_paper_code/master/fig3/"
-  read_calls <- function(file) {
-    utils::read.table(cached_download(paste0(base_url, file)), header = TRUE,
-                      stringsAsFactors = FALSE)
-  }
-  info <- rbind(read_calls("ye1.ctrl.8.10.sm.best"), read_calls("ye2.stim.8.10.sm.best"))
+  info <- do.call(rbind, lapply(fetch_ifnb_donor_files(), utils::read.table,
+                                header = TRUE, stringsAsFactors = FALSE))
 
   # ifnb cell names use "." where the demuxlet barcodes use "-"
   info$BARCODE <- gsub("-", ".", info$BARCODE, fixed = TRUE)
