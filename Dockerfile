@@ -17,7 +17,7 @@
 #   docker run --rm -it -v $(pwd):/work seurat-cli bash
 #
 # Published image (linux/amd64, built by .github/workflows/docker-publish.yml):
-#   docker pull ghcr.io/bminie/seurat-cli:latest
+#   docker pull ghcr.io/bminie/seurat-cli:latest   (also bminie/seurat-cli on Docker Hub)
 #   apptainer pull seurat-cli.sif docker://ghcr.io/bminie/seurat-cli:latest
 #
 # =============================================================================

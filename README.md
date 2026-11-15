@@ -108,9 +108,10 @@ Or open in RStudio by double-clicking `seurat-cli.Rproj`.
 Run without installing any dependencies. The published image is
 `ghcr.io/bminie/seurat-cli` (linux/amd64, built by
 `.github/workflows/docker-publish.yml`); the pipelines' container profiles use it.
+The same image is also on Docker Hub as `bminie/seurat-cli`.
 
 ```bash
-# Pull the published image
+# Pull the published image (or: docker pull bminie/seurat-cli:latest)
 docker pull ghcr.io/bminie/seurat-cli:latest
 docker tag ghcr.io/bminie/seurat-cli:latest seurat-cli
 

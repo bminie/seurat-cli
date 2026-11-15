@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Snakemake SLURM profile (`workflows/snakemake/profiles/slurm`), per-rule `mem_mb`/`runtime` (`resources` in the config), and a `container` setting; `snakemake-executor-plugin-slurm` added to `environment.yml`
   - The image caches script 07's demo donor IDs, so every demo runs on compute nodes without internet access
   - "Running on an HPC Cluster" guide in `workflows/README.md`
+- The image is also published to Docker Hub (`bminie/seurat-cli`). Publishing runs in its own job, only for main and `v*` tags, in a `publish` environment that holds the Docker Hub token; the build-and-test job has no secrets and a read-only token. The workflow's actions are pinned to commit SHAs, and Dependabot (`.github/dependabot.yml`) keeps the GitHub Actions up to date
 - README covers the spatial (Xenium/Atera) and sample-level analyses alongside single-cell: overview table, quick start (including the synthetic Xenium folder), input formats, outputs, and a Xenium example
 
 ### Changed

@@ -1,0 +1,11 @@
+# Keeps the GitHub Actions in .github/workflows up to date, including the
+# commit SHAs that docker-publish.yml pins them to
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']
