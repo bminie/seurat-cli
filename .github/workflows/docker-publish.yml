@@ -31,7 +31,8 @@ name: Docker Image
 #   Replace the token before it expires; nothing else stores it.
 #
 # Actions are pinned to commit SHAs so a moved tag can't change what runs
-# with publishing credentials; Dependabot (.github/dependabot.yml) updates them.
+# with publishing credentials. Update them by hand: the version is in the
+# comment after each SHA.
 
 on:
   push:
