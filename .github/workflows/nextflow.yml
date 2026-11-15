@@ -12,7 +12,7 @@ jobs:
     name: Nextflow Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Nextflow
         uses: nf-core/setup-nextflow@v2
@@ -40,7 +40,7 @@ jobs:
     name: Config Validation
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Nextflow
         uses: nf-core/setup-nextflow@v2
