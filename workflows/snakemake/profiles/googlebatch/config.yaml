@@ -1,0 +1,56 @@
+# =============================================================================
+# Snakemake profile: Google Batch, with inputs and outputs in Cloud Storage
+# =============================================================================
+#
+# From workflows/snakemake, with environment-cloud.yml active and signed in
+# with Application Default Credentials (gcloud auth application-default login):
+#
+#   snakemake --configfile my_config.yaml --workflow-profile profiles/googlebatch \
+#       --default-storage-prefix gs://my-bucket/seurat-run \
+#       --storage-gcs-project my-project-id \
+#       --googlebatch-project my-project-id --googlebatch-region us-central1
+#
+# - output_dir, input_path and the samples in input_list are paths under the
+#   storage prefix; full gs:// URLs work for inputs in other buckets.
+# - Keep my_config.yaml in this folder or below: Snakemake uploads the
+#   Snakefile and config files under the working directory for the jobs.
+# - Jobs run as the project's Compute Engine default service account (or
+#   googlebatch-service-account), which needs access to the buckets. The
+#   Batch API and Cloud Logging API must be enabled.
+# - The Snakefile passes each rule's memory, threads, and time limit to
+#   Google Batch; the machine type has to be big enough for the largest rule.
+#
+# Copy this profile and change it to fit your project.
+# =============================================================================
+
+executor: googlebatch
+jobs: 20
+
+# Every job runs Snakemake in this image (on Container-Optimized OS VMs),
+# which has the scripts, R packages, and the same Snakemake and storage
+# plugins as environment-cloud.yml. A copy in your own Artifact Registry
+# starts jobs faster.
+container-image: ghcr.io/bminie/seurat-cli:latest
+googlebatch-image-family: batch-cos-stable-official
+googlebatch-image-project: batch-custom-image
+
+# 4 vCPUs, 32 GB: fits every rule's default resources
+googlebatch-machine-type: n2-highmem-4
+# Room for the ~6 GB image plus the job's input and output files
+googlebatch-boot-disk-gb: 50
+
+default-storage-provider: gcs
+# default-storage-prefix: gs://my-bucket/seurat-run
+# storage-gcs-project: my-project-id
+
+# googlebatch-project: my-project-id
+# googlebatch-region: us-central1
+# googlebatch-service-account: seurat-cli@my-project-id.iam.gserviceaccount.com
+# googlebatch-network: projects/my-project-id/global/networks/my-network
+# googlebatch-subnetwork: projects/my-project-id/regions/us-central1/subnetworks/my-subnet
+
+# Spot VMs for some rules (cheaper; a reclaimed job is retried)
+# preemptible-rules: [differential_expression, visualization]
+
+retries: 1
+printshellcmds: true

@@ -1,0 +1,59 @@
+# =============================================================================
+# Snakemake profile: Azure Batch, with inputs and outputs in Blob Storage
+# =============================================================================
+#
+# From workflows/snakemake, with environment-cloud.yml active and signed in
+# (az login, a managed identity, or service principal variables):
+#
+#   export SNAKEMAKE_AZURE_BATCH_ACCOUNT_URL=https://myaccount.eastus.batch.azure.com
+#   export SNAKEMAKE_AZURE_BATCH_SUBSCRIPTION_ID=<subscription id>
+#   export SNAKEMAKE_AZURE_BATCH_RESOURCE_GROUP_NAME=<resource group>
+#   snakemake --configfile my_config.yaml --workflow-profile profiles/azure-batch \
+#       --default-storage-prefix az://my-container/seurat-run \
+#       --storage-azure-account-name mystorageaccount \
+#       --azure-batch-managed-identity-resource-id <identity resource id> \
+#       --azure-batch-managed-identity-client-id <identity client id>
+#
+# - output_dir, input_path and the samples in input_list are paths under the
+#   storage prefix (az://<container>/<path>; the account is
+#   storage-azure-account-name); full az:// URLs work for other containers.
+# - Keep my_config.yaml in this folder or below: Snakemake uploads the
+#   Snakefile and config files under the working directory for the jobs.
+# - The Batch nodes reach Blob Storage with the managed identity, which
+#   needs the Storage Blob Data Contributor role on the storage account. You
+#   need Contributor on the Batch account.
+# - Snakemake creates one pool for the run and deletes it at the end
+#   (azure-batch-keep-pool keeps it).
+#
+# Copy this profile and change it to fit your subscription.
+# =============================================================================
+
+executor: azure-batch
+jobs: 20
+
+# Every job runs Snakemake in this image, which has the scripts, R packages,
+# and the same Snakemake and storage plugins as environment-cloud.yml. A copy
+# in your own Azure Container Registry starts jobs faster (see the
+# azure-batch-container-registry-* settings).
+container-image: ghcr.io/bminie/seurat-cli:latest
+
+# 4 vCPUs, 32 GB: fits every rule's default resources. One job per node.
+azure-batch-pool-vm-size: Standard_E4d_v5
+azure-batch-tasks-per-node: 1
+azure-batch-pool-node-count: 2
+# Start at zero nodes and grow with the queue (takes ~5 min to resize)
+# azure-batch-autoscale: true
+
+# A container-ready Ubuntu 22.04 image (the plugin's default, Ubuntu 20.04
+# from microsoft-azure-batch, is being retired)
+azure-batch-pool-image-publisher: microsoft-dsvm
+azure-batch-pool-image-offer: ubuntu-hpc
+azure-batch-pool-image-sku: "2204"
+azure-batch-pool-vm-node-agent-sku-id: batch.node.ubuntu 22.04
+
+default-storage-provider: azure
+# default-storage-prefix: az://my-container/seurat-run
+# storage-azure-account-name: mystorageaccount
+
+retries: 1
+printshellcmds: true

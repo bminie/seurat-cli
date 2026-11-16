@@ -1,0 +1,53 @@
+# =============================================================================
+# Snakemake profile: AWS Batch, with inputs and outputs in S3
+# =============================================================================
+#
+# From workflows/snakemake, with environment-cloud.yml active:
+#
+#   snakemake --configfile my_config.yaml --workflow-profile profiles/aws-batch \
+#       --default-storage-prefix s3://my-bucket/seurat-run \
+#       --aws-batch-region us-east-1 \
+#       --aws-batch-job-queue arn:aws:batch:us-east-1:123456789012:job-queue/my-queue \
+#       --aws-batch-job-role arn:aws:iam::123456789012:role/my-batch-job-role
+#
+# (or set SNAKEMAKE_AWS_BATCH_JOB_QUEUE and SNAKEMAKE_AWS_BATCH_JOB_ROLE).
+#
+# - output_dir, input_path and the samples in input_list are paths under the
+#   storage prefix (input_path: data/pbmc means s3://my-bucket/seurat-run/data/pbmc);
+#   full s3:// URLs work for inputs in other buckets.
+# - Keep my_config.yaml in this folder or below: Snakemake uploads the
+#   Snakefile and config files under the working directory for the jobs.
+# - The job role needs read/write access to the buckets. The launching
+#   machine uses the usual AWS credentials (environment, ~/.aws, or a role).
+# - AWS Batch only takes some memory sizes for each vCPU count; the
+#   Snakefile rounds each rule's memory up to one of them.
+#
+# Copy this profile and change it to fit your account.
+# =============================================================================
+
+executor: aws-batch
+jobs: 20
+
+# Every job runs Snakemake in this image, which has the scripts, R packages,
+# and the same Snakemake and storage plugins as environment-cloud.yml. A copy
+# in your own ECR registry starts jobs faster.
+container-image: ghcr.io/bminie/seurat-cli:latest
+
+default-storage-provider: s3
+# default-storage-prefix: s3://my-bucket/seurat-run
+# storage-s3-region: us-east-1
+
+# Jobs still running after this many seconds are stopped (the plugin's
+# default is 300). Longest rule default: 4 hours.
+aws-batch-task-timeout: 14400
+
+# aws-batch-region: us-east-1
+# aws-batch-tags: {project: seurat-cli}
+
+retries: 1
+printshellcmds: true
+
+# Bigger runs: more threads per rule (AWS Batch then allows more memory), or
+# more memory (resources in the config file)
+# set-threads:
+#   integration: 8

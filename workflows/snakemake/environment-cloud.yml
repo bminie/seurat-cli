@@ -1,0 +1,38 @@
+# =============================================================================
+# Seurat CLI - Snakemake cloud launcher
+# =============================================================================
+#
+# What the machine that starts a cloud run needs (a laptop, a cloud shell, or
+# a small VM). The analysis runs in the image on the cloud, so no R here.
+#
+#   mamba env create -f workflows/snakemake/environment-cloud.yml
+#   conda activate seurat-cli-cloud
+#
+# Snakemake must match the version in the image (SNAKEMAKE_VERSION in the
+# Dockerfile): each cloud job runs that copy with the options this one passes.
+# The storage plugins match the image's too.
+#
+# =============================================================================
+
+name: seurat-cli-cloud
+
+channels:
+  - conda-forge
+  - bioconda
+
+dependencies:
+  - python>=3.11
+  - snakemake=9.27.1
+
+  # Storage: s3://, gs://, az://
+  - snakemake-storage-plugin-s3=0.3.6
+  - snakemake-storage-plugin-gcs=1.1.4
+  - snakemake-storage-plugin-azure=0.4.4
+
+  # Executors (profiles/aws-batch, profiles/googlebatch, profiles/azure-batch)
+  - snakemake-executor-plugin-aws-batch=0.2.1
+  - snakemake-executor-plugin-googlebatch=0.5.1
+  - snakemake-executor-plugin-azure-batch=0.3.0
+
+  # Snakemake lists the workflow files to upload for the jobs with git
+  - git

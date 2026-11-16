@@ -47,8 +47,16 @@ output_dir: "results"
 input_path: "/path/to/your/data"
 
 # For integration and sample_level workflows - file containing paths (one per
-# line) or comma-separated
+# line), comma-separated, or a list:
+#   input_list:
+#     - /path/to/sample1.rds
+#     - /path/to/sample2.rds
+# On cloud executors use a list: jobs can't read a list file from your machine.
 input_list: "/path/to/sample_list.txt"
+
+# With cloud storage (--default-storage-prefix), output_dir, input_path and
+# the samples are paths under the prefix; full s3://, gs:// or az:// URLs work
+# for inputs anywhere. See "Running on the Cloud" in workflows/README.md.
 
 # -----------------------------------------------------------------------------
 # Common Parameters
@@ -66,13 +74,14 @@ threads: 4
 #   apptainer pull seurat-cli.sif docker://ghcr.io/bminie/seurat-cli:latest
 # container: "/shared/containers/seurat-cli.sif"
 
-# Memory (MB) and time limit (minutes) per rule, used by cluster executors.
-# Defaults: 8000 MB / 240 min; sctransform 6000/120, integration 16000/240,
-# differential_expression 8000/120, sample_level 16000/240, spatial 16000/240.
-# "default" here applies to every rule; a rule's own entry wins over it.
+# Memory (MB) and time limit (minutes) per rule, used by cluster and cloud
+# executors. Defaults: 8192 MB / 240 min; sctransform 6144/120, integration
+# 16384/240, differential_expression 8192/120, sample_level 16384/240, spatial
+# 16384/240. "default" here applies to every rule; a rule's own entry wins
+# over it. On AWS Batch, memory is rounded up to a size it accepts.
 # resources:
-#   default: {mem_mb: 8000, runtime: 240}
-#   integration: {mem_mb: 64000, runtime: 480}
+#   default: {mem_mb: 8192, runtime: 240}
+#   integration: {mem_mb: 65536, runtime: 480}
 
 # -----------------------------------------------------------------------------
 # Script-Specific Parameters
