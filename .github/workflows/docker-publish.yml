@@ -41,6 +41,7 @@ on:
     # Path filters don't apply to tag pushes, so releases always build
     paths:
       - Dockerfile
+      - docker/**
       - scripts/**
       - utils/**
       - tests/**
@@ -49,6 +50,7 @@ on:
     branches: [main]
     paths:
       - Dockerfile
+      - docker/**
       - scripts/**
       - utils/**
       - tests/**
@@ -100,6 +102,10 @@ jobs:
             Rscript -e 'cat("Seurat", as.character(packageVersion("Seurat")), "\n")'
           docker run --rm -u 1001:1001 -e HOME=/tmp seurat-cli:test \
             Rscript /app/scripts/01_basic_analysis.R --demo --output /tmp/smoke
+          # Cloud tools: AWS CLI (Nextflow AWS Batch) and Snakemake with its
+          # storage plugins (Snakemake cloud executors)
+          docker run --rm -u 1001:1001 -e HOME=/tmp seurat-cli:test bash -c \
+            'aws --version && snakemake --version && python -c "import snakemake_storage_plugin_s3, snakemake_storage_plugin_gcs, snakemake_storage_plugin_azure"'
 
   publish:
     name: Publish (GHCR, Docker Hub)

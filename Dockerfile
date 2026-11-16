@@ -139,6 +139,54 @@ RUN Rscript -e " \
     cat('All', length(pkgs), 'R packages available. Seurat', \
         as.character(packageVersion('Seurat')), '\n')"
 
+# -----------------------------------------------------------------------------
+# Cloud support
+# -----------------------------------------------------------------------------
+
+# AWS CLI v2: Nextflow's AWS Batch tasks copy their files to and from S3 with
+# it. The download is checked against the AWS CLI team's signing key
+# (docker/aws-cli.asc, from the AWS CLI install guide; fingerprint
+# FB5D B77F D5C1 18B8 0511 ADA8 A631 0ACC 4672 475C). The key expires on
+# 2027-07-01: replace the file with AWS's renewed key then.
+ARG AWSCLI_VERSION=2.40.3
+COPY docker/aws-cli.asc /tmp/aws-cli.asc
+RUN apt-get update && apt-get install -y --no-install-recommends curl unzip gnupg \
+    && rm -rf /var/lib/apt/lists/* \
+    && cd /tmp \
+    && url="https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m)-${AWSCLI_VERSION}.zip" \
+    && curl -fsSL -o awscliv2.zip "$url" \
+    && curl -fsSL -o awscliv2.zip.sig "$url.sig" \
+    && export GNUPGHOME="$(mktemp -d)" \
+    && gpg --batch --quiet --import /tmp/aws-cli.asc \
+    && gpg --batch --verify awscliv2.zip.sig awscliv2.zip \
+    && unzip -q awscliv2.zip \
+    && ./aws/install \
+    && rm -rf /tmp/aws /tmp/awscliv2.zip /tmp/awscliv2.zip.sig /tmp/aws-cli.asc "$GNUPGHOME" \
+    && aws --version
+
+# Snakemake and its storage plugins. Snakemake's cloud executors (AWS Batch,
+# Google Batch, Azure Batch) run Snakemake inside this image for each job, so
+# these versions must match the Snakemake that launches the workflow
+# (workflows/snakemake/environment-cloud.yml pins the same ones). The
+# environment goes first on PATH: the executors run "python -m snakemake" and
+# "pip install", and Ubuntu's own Python doesn't allow pip installs.
+# python3-dev: some dependencies (immutables) have no prebuilt package for
+# this Python version, so pip compiles them.
+ARG SNAKEMAKE_VERSION=9.27.1
+RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-venv python3-dev \
+    && rm -rf /var/lib/apt/lists/* \
+    && python3 -m venv /opt/snakemake \
+    && /opt/snakemake/bin/pip install --no-cache-dir \
+        "snakemake==${SNAKEMAKE_VERSION}" \
+        "snakemake-storage-plugin-s3==0.3.6" \
+        "snakemake-storage-plugin-gcs==1.1.4" \
+        "snakemake-storage-plugin-azure==0.4.4" \
+    && /opt/snakemake/bin/snakemake --version
+ENV PATH="/opt/snakemake/bin:${PATH}"
+
+# Tells the Snakefile where the scripts are when Snakemake runs in the image
+ENV SEURAT_CLI_SCRIPTS=/app/scripts
+
 # Create working directory
 WORKDIR /app
 
