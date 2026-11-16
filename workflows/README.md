@@ -216,8 +216,11 @@ containers can read them. Snakemake checks that every listed sample exists
 before it starts.
 
 Then use:
-- Snakemake: Set `input_list: "samples.txt"` in config
-- Nextflow: `--input_list samples.txt --workflow integration`
+- Snakemake: Set `input_list: "samples.txt"` in config, or list the samples
+  there directly (`input_list: [/path/to/sample1, /path/to/sample2]`), which is
+  required for cloud runs
+- Nextflow: `--input_list samples.txt --workflow integration` (the list and its
+  paths can be in a bucket)
 
 ### Sample-Level Analysis (sample_level)
 
@@ -392,6 +395,162 @@ reports that accounting is disabled on your cluster, add
 For other schedulers (LSF, SGE, ...), set the matching Nextflow executor in a
 config file passed with `-c` (`process.executor = 'lsf'`), or use the matching
 Snakemake executor plugin.
+
+## Running on the Cloud
+
+Both pipelines can run each step as a job on AWS Batch, Google Batch, or Azure
+Batch, with the data in the provider's object storage. Start the run from any
+machine with a checkout of this repository (a laptop, a cloud shell, or a small
+VM); each step runs in the `ghcr.io/bminie/seurat-cli` image on a cloud machine.
+
+The profiles below cover a basic setup. Cloud accounts are set up in many
+different ways, so treat them as a starting point: copy them and add your own
+networking, roles, registry, and machine settings.
+
+Before the first run you need:
+
+- **Object storage** for the work and output files that the jobs can read and
+  write: an S3 bucket, a Cloud Storage bucket, or an Azure Blob container. Put
+  the input data there too; inputs are bucket paths (`s3://`, `gs://`, `az://`).
+- **The batch service:**
+  - AWS: an AWS Batch compute environment and job queue, with instance types
+    large enough for the biggest step (16 GB by default).
+  - Google: the Batch and Cloud Logging APIs enabled in the project.
+  - Azure: a Batch account and a storage account.
+- **Access to the image:** the jobs pull the ~6 GB image from ghcr.io, so they
+  need internet access. A copy in your own registry (ECR, Artifact Registry, ACR)
+  in the same region starts jobs faster.
+
+### Nextflow
+
+```bash
+cd workflows/nextflow
+
+# AWS Batch
+nextflow run main.nf -profile awsbatch \
+    --aws_region us-east-1 --aws_queue my-queue \
+    -work-dir s3://my-bucket/work \
+    --input s3://my-bucket/data/pbmc --outdir s3://my-bucket/results
+
+# Google Batch (signed in with: gcloud auth application-default login)
+nextflow run main.nf -profile googlebatch \
+    --google_project my-project-id --google_location us-central1 \
+    -work-dir gs://my-bucket/work \
+    --input gs://my-bucket/data/pbmc --outdir gs://my-bucket/results
+
+# Azure Batch (account names and keys from the environment)
+export AZURE_BATCH_ACCOUNT_NAME=mybatchaccount AZURE_BATCH_ACCOUNT_KEY=...
+export AZURE_STORAGE_ACCOUNT_NAME=mystorageaccount AZURE_STORAGE_ACCOUNT_KEY=...
+nextflow run main.nf -profile azurebatch --azure_location eastus \
+    -work-dir az://my-container/work \
+    --input az://my-container/data/pbmc --outdir az://my-container/results
+```
+
+- `-work-dir` must be a bucket path. The pipeline stops at the start if it
+  isn't, or if a profile's required options are missing.
+- `--input`, `--input_list` (and the paths listed in it), and `--outdir` can
+  all be bucket paths. A local `--outdir` also works: Nextflow copies the
+  results back to the launching machine.
+- Each step asks for its own memory and CPUs (16 GB for integration,
+  sample-level, and spatial; 6-8 GB for the rest; `--threads` CPUs), up to
+  `--max_memory` and `--max_cpus`. On Azure, Nextflow creates pools of the
+  smallest `--azure_machine_type` VM (default `Standard_E*d_v5`) that fits each
+  step, and deletes them at the end.
+- Credentials:
+  - AWS: Nextflow uses your usual AWS credentials (environment, `~/.aws`, or a
+    role). The jobs use the compute environment's instance role, which needs
+    access to the buckets.
+  - Google: Application Default Credentials. Jobs run as the project's Compute
+    Engine default service account unless you set another.
+  - Azure: account keys, a service principal (`AZURE_CLIENT_ID`,
+    `AZURE_CLIENT_SECRET`, `AZURE_TENANT_ID`), or a managed identity, all from
+    environment variables. Don't write keys into config files.
+- For everything else (job roles, spot instances, networks, private IPs, your
+  own registry, bigger machines), copy
+  [`conf/cloud.example.config`](nextflow/conf/cloud.example.config), uncomment
+  what you need, and add `-c my-cloud.config`.
+- `-resume` works with a bucket work directory. Old work files stay in the
+  bucket, so delete them, or set a lifecycle rule on the `work/` prefix.
+
+### Snakemake
+
+Snakemake's cloud executors run Snakemake itself inside the image for each job,
+so the machine you launch from needs the same Snakemake version and plugins as
+the image. `environment-cloud.yml` has them (and no R, which runs in the image):
+
+```bash
+mamba env create -f workflows/snakemake/environment-cloud.yml
+conda activate seurat-cli-cloud
+cd workflows/snakemake
+```
+
+In the config, `output_dir`, `input_path`, and the samples are paths under the
+storage prefix given on the command line. Full URLs work for data elsewhere.
+Give integration samples as a list in the config: cloud jobs can't read a list
+file from your machine.
+
+```yaml
+# my_config.yaml, kept in workflows/snakemake or a folder below it
+workflow: integration
+output_dir: results
+threads: 4
+input_list:
+  - data/sample1.rds                 # <prefix>/data/sample1.rds
+  - data/sample2.rds
+  - s3://other-bucket/sample3.rds
+integration:
+  conditions: "ctrl,ctrl,stim"
+```
+
+```bash
+# AWS Batch
+snakemake --configfile my_config.yaml --workflow-profile profiles/aws-batch \
+    --default-storage-prefix s3://my-bucket/seurat-run \
+    --aws-batch-region us-east-1 \
+    --aws-batch-job-queue arn:aws:batch:us-east-1:123456789012:job-queue/my-queue \
+    --aws-batch-job-role arn:aws:iam::123456789012:role/my-batch-job-role
+
+# Google Batch (signed in with: gcloud auth application-default login)
+snakemake --configfile my_config.yaml --workflow-profile profiles/googlebatch \
+    --default-storage-prefix gs://my-bucket/seurat-run \
+    --storage-gcs-project my-project-id \
+    --googlebatch-project my-project-id --googlebatch-region us-central1
+
+# Azure Batch (signed in with: az login)
+export SNAKEMAKE_AZURE_BATCH_ACCOUNT_URL=https://mybatchaccount.eastus.batch.azure.com
+export SNAKEMAKE_AZURE_BATCH_SUBSCRIPTION_ID=<subscription id>
+export SNAKEMAKE_AZURE_BATCH_RESOURCE_GROUP_NAME=<resource group>
+snakemake --configfile my_config.yaml --workflow-profile profiles/azure-batch \
+    --default-storage-prefix az://my-container/seurat-run \
+    --storage-azure-account-name mystorageaccount \
+    --azure-batch-managed-identity-resource-id <identity resource id> \
+    --azure-batch-managed-identity-client-id <identity client id>
+```
+
+- Launch from `workflows/snakemake`, inside the git checkout, with the config
+  file there or in a folder below it. Snakemake uploads the Snakefile and the
+  config files for the jobs (it lists them with git) and skips files above the
+  working directory.
+- Every step's output is its folder (e.g. `results/01_basic/`), so each figure
+  and table is uploaded, not just the Seurat object.
+- Memory and time per rule come from `resources` in the config, as on HPC:
+  - AWS Batch takes only certain memory sizes per vCPU count. The Snakefile
+    rounds memory up to one of them and raises the thread count when a size
+    needs more vCPUs (up to 16 vCPUs and 120 GB).
+  - Google Batch gets each rule's memory, threads, and time limit. The
+    profile's machine type (`n2-highmem-4`, 32 GB) must fit the largest rule.
+  - Azure Batch runs every job on one pool of `azure-batch-pool-vm-size` VMs
+    (`Standard_E4d_v5`, 32 GB).
+- Credentials for the jobs: use the job role (AWS), the job service account
+  (Google), or the managed identity (Azure). Don't pass storage access keys
+  on the command line for cloud runs: the AWS Batch plugin writes them into the
+  job definition in plain text.
+- Each job installs Snakemake's storage plugins with `pip` when it starts, so
+  jobs need internet access.
+- To read and write buckets while running on your own machine or an HPC
+  cluster instead, add only `--default-storage-provider s3` and
+  `--default-storage-prefix s3://my-bucket/seurat-run` (with `gcs` or `azure` for the
+  other clouds) and the storage plugin.
 
 ## Testing
 

@@ -178,6 +178,8 @@ The `docker`, `singularity`, and `apptainer` profiles (Nextflow) and
 another image, pass `--container seurat-cli` (Nextflow) or set `container` in
 the Snakemake config; a local `.sif` file also works. For SLURM and PBS
 clusters, see [Running on an HPC cluster](workflows/README.md#running-on-an-hpc-cluster).
+For AWS Batch, Google Batch, and Azure Batch, see
+[Running on the cloud](workflows/README.md#running-on-the-cloud).
 
 ```bash
 # Nextflow with Docker
@@ -718,10 +720,15 @@ nextflow run main.nf --input /path/to/data -profile docker
 
 # Run on a SLURM cluster with Apptainer
 nextflow run main.nf --input /path/to/data -profile slurm,apptainer
+
+# Run on AWS Batch, with data and results in S3
+nextflow run main.nf -profile awsbatch --aws_region us-east-1 --aws_queue my-queue \
+    -work-dir s3://my-bucket/work --input s3://my-bucket/data --outdir s3://my-bucket/results
 ```
 
 See [workflows/README.md](workflows/README.md) for detailed documentation,
-including [running on an HPC cluster](workflows/README.md#running-on-an-hpc-cluster).
+including [running on an HPC cluster](workflows/README.md#running-on-an-hpc-cluster)
+and [on the cloud](workflows/README.md#running-on-the-cloud) (AWS, Google Cloud, Azure).
 
 ## Testing
 

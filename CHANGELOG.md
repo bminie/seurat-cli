@@ -39,6 +39,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The image caches script 07's demo donor IDs, so every demo runs on compute nodes without internet access
   - "Running on an HPC Cluster" guide in `workflows/README.md`
 - The image is also published to Docker Hub (`bminie7/seurat-cli`). Publishing runs in its own job, only for main and `v*` tags, in a `publish` environment that holds the Docker Hub token; the build-and-test job has no secrets and a read-only token. The workflow's actions are pinned to commit SHAs
+- Cloud support (AWS Batch, Google Batch, Azure Batch):
+  - Nextflow `awsbatch`, `googlebatch`, and `azurebatch` profiles (`--aws_region`, `--aws_queue`, `--google_project`, `--google_location`, `--google_spot`, `--azure_location`, `--azure_machine_type`); work directory, inputs, sample lists, and `--outdir` can be bucket paths. The pipeline stops at the start when a profile's settings or a bucket work directory are missing. `conf/cloud.example.config` has the usual extra settings (roles, spot, networks, own registry) to copy
+  - Snakemake `aws-batch`, `googlebatch`, and `azure-batch` profiles, cloud storage for inputs and outputs (`--default-storage-provider s3`/`gcs`/`azure`, or full `s3://`, `gs://`, `az://` input URLs), and `workflows/snakemake/environment-cloud.yml` for the launching machine
+  - The image adds the AWS CLI (signature-checked) for Nextflow's AWS Batch tasks, and Snakemake 9.27.1 with the S3, Cloud Storage, and Azure storage plugins for Snakemake's cloud jobs
+  - Snakemake `input_list` can be a list in the config (needed on cloud executors)
+  - "Running on the Cloud" guide in `workflows/README.md`
 - README covers the spatial (Xenium/Atera) and sample-level analyses alongside single-cell: overview table, quick start (including the synthetic Xenium folder), input formats, outputs, and a Xenium example
 
 ### Changed
@@ -47,6 +53,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Nextflow pipeline requires Nextflow >= 24.04; resource caps use the built-in `resourceLimits` instead of a custom `check_max` function
 - Pipeline containers use `ghcr.io/bminie/seurat-cli` instead of the never-published `bminie/seurat-cli`
 - Nextflow `slurm` and `pbs` profiles no longer override every process with 4 CPUs / 16 GB / 4 h, so each process keeps its own resources, and no longer hard-code a placeholder queue and account
+- Snakemake: each step's output is its folder (e.g. `results/01_basic/`) instead of two files in it, so cloud storage keeps every figure and table; inputs (`input_path`, `sample_level.input_rds`) are declared, so Snakemake checks they exist and fetches them from storage
+- Snakemake default memory is in MiB (8192, 6144, 16384 instead of 8000, 6000, 16000), matching Nextflow's 8 GB / 16 GB; on AWS Batch, memory and threads are rounded up to sizes it accepts
 - Sample lists (`--input_list`) skip `#` comment lines
 - Snakemake finds the scripts relative to the Snakefile, not the launch directory
 - Snakemake demo config only passes `--demo` to entry-point steps, so downstream steps use upstream outputs; demo can now run the `basic` and `integration` workflows
@@ -58,6 +66,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `setup.R` installs ComplexHeatmap and destiny by default and the spatial readers with `--all`; it installs destiny 3.26 from Bioconductor 3.23 when the older release can't install (its `smoother` dependency was archived on CRAN), and sets a CRAN mirror when none is configured
 
 ### Fixed
+- Nextflow `--demo` passed a placeholder input file that didn't exist, which cloud executors can't upload; it is now `workflows/nextflow/assets/demo_placeholder.txt`
 - Nextflow read `--demo false` (and `--cc_regress false`, `--cc_regress_difference false`) as true: Nextflow passes command-line values as text, and any non-empty text counts as true. These options now accept true/false, yes/no, or 1/0, and stop with an error for anything else
 - Nextflow integration and sample-level runs only passed the sample list file to the task, not the samples in it, so the `docker`/`singularity` profiles couldn't read them. Each listed sample is now staged into the task
 - Snakemake `--sdm apptainer` looked for the scripts at `../../scripts`, which isn't mounted in the container; container runs now use `/app/scripts`
