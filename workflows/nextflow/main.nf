@@ -185,6 +185,20 @@ def helpMessage() {
       nextflow run main.nf -profile slurm,apptainer --input_list samples.txt \\
           --workflow integration --cluster_options="--account=lab"
 
+    Cloud (profiles: awsbatch, googlebatch or azurebatch; -work-dir must be a
+    bucket path, and inputs and --outdir can be bucket paths too):
+      --aws_region, --aws_queue       AWS Batch region and job queue
+      --google_project                Google Cloud project ID
+      --google_location               Google Batch region (default: us-central1)
+      --google_spot                   Use spot VMs (default: false)
+      --azure_location                Azure Batch region; account names and
+                                      keys come from AZURE_* variables
+      --azure_machine_type            VM family (default: Standard_E*d_v5)
+
+      nextflow run main.nf -profile awsbatch --aws_region us-east-1 \\
+          --aws_queue my-queue -work-dir s3://my-bucket/work \\
+          --input s3://my-bucket/pbmc --outdir s3://my-bucket/results
+
     =============================================================================
     """.stripIndent()
 }
@@ -590,11 +604,31 @@ workflow {
         exit 1
     }
 
+    // Cloud profiles need their settings and a work directory in a bucket
+    def cloud_needs = [awsbatch: ['aws_region', 'aws_queue'], googlebatch: ['google_project'], azurebatch: ['azure_location']]
+    def cloud_scheme = [awsbatch: 's3', googlebatch: 'gs', azurebatch: 'az']
+    def cloud_errors = []
+    workflow.profile.tokenize(',').findAll { name -> cloud_needs.containsKey(name) }.each { name ->
+        def missing = cloud_needs[name].findAll { opt -> !params[opt] || params[opt] == true || params[opt] == 'true' }
+        if (missing) {
+            cloud_errors << "the ${name} profile needs ${missing.collect { opt -> "--${opt}" }.join(' and ')}"
+        }
+        def scheme = cloud_scheme[name]
+        if (!workflow.workDir.toUriString().startsWith("${scheme}://")) {
+            cloud_errors << "the ${name} profile needs a work directory in a bucket, e.g. -work-dir ${scheme}://my-bucket/work"
+        }
+    }
+    if (cloud_errors) {
+        log.error "Error: ${cloud_errors.join('; ')}"
+        exit 1
+    }
+
     // Create input channel
     if (params.workflow == "spatial") {
         input_ch = channel.of(file(params.input, checkIfExists: true))
     } else if (isTrue(params.demo)) {
-        input_ch = channel.of(file("${projectDir}/dummy_input"))
+        // A real file: cloud executors upload task inputs, so the path must exist
+        input_ch = channel.of(file("${projectDir}/assets/demo_placeholder.txt", checkIfExists: true))
     } else if (params.workflow == "sample_level" && params.sl_input_rds) {
         input_ch = channel.fromPath(params.sl_input_rds, checkIfExists: true)
     } else if (params.workflow in ["integration", "sample_level"]) {

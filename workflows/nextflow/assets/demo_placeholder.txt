@@ -1,0 +1,3 @@
+Placeholder input for --demo runs: the scripts load the demo datasets from the
+image or R library instead. It must be a real file, because cloud executors
+upload each task's inputs.
