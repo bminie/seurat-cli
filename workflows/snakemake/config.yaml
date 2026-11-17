@@ -34,6 +34,10 @@ workflow: "sctransform"
 # folder, or the copy in the image with --sdm apptainer.
 # scripts_dir: "/path/to/seurat-cli/scripts"
 
+# Where the scripts are inside the image, used when rules run in the
+# container (--sdm apptainer)
+container_scripts_dir: "/app/scripts"
+
 # Output directory for all results
 output_dir: "results"
 

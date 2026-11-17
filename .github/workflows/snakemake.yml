@@ -20,7 +20,8 @@ jobs:
           python-version: '3.11'
 
       - name: Install Snakemake
-        run: pip install snakemake
+        # Same version as the image and environment-cloud.yml
+        run: pip install snakemake==9.27.1
 
       - name: Check Snakemake version
         run: snakemake --version
@@ -29,7 +30,6 @@ jobs:
         run: |
           cd workflows/snakemake
           snakemake --configfile config_demo.yaml --lint
-        continue-on-error: true  # Lint warnings are non-blocking
 
   dry-run:
     name: Dry Run
@@ -44,7 +44,8 @@ jobs:
           python-version: '3.11'
 
       - name: Install Snakemake
-        run: pip install snakemake
+        # Same version as the image and environment-cloud.yml
+        run: pip install snakemake==9.27.1
 
       - name: Dry run with demo config
         run: |

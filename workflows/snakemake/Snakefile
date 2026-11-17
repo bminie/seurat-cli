@@ -26,7 +26,6 @@
 # =============================================================================
 
 import os
-import tempfile
 from pathlib import Path
 
 # -----------------------------------------------------------------------------
@@ -97,7 +96,7 @@ if WORKFLOW not in WORKFLOWS:
 SCRIPTS_DIR = (
     config.get("scripts_dir")
     or os.environ.get("SEURAT_CLI_SCRIPTS")
-    or ("/app/scripts" if using_container()
+    or (config["container_scripts_dir"] if using_container()
         else os.path.normpath(os.path.join(workflow.basedir, "..", "..", "scripts"))))
 
 # Relative to the working directory, or to --default-storage-prefix when
@@ -212,6 +211,10 @@ STEP_RDS = {
 
 def step_dir(step):
     return os.path.join(OUTPUT_DIR, STEP_DIRS[step])
+
+def optional_arg(flag, value):
+    """'--flag "value"', or nothing when the value is empty."""
+    return f'{flag} "{value}"' if value else ""
 
 def get_script_path(script_name):
     """Get full path to a script."""
@@ -329,6 +332,9 @@ rule basic_analysis:
         directory(step_dir("basic"))
     params:
         script = get_script_path("01_basic_analysis.R"),
+        species = SPECIES,
+        # --input with the data, nothing for the demo (--demo in extra_args)
+        input_flag = "--input" if data_input(INPUT_PATH) else "",
         min_features = config.get("basic", {}).get("min_features", 200),
         max_features = config.get("basic", {}).get("max_features", 2500),
         max_mt = config.get("basic", {}).get("max_mt", 5),
@@ -340,13 +346,12 @@ rule basic_analysis:
         **rule_resources("basic_analysis")
     log:
         os.path.join(OUTPUT_DIR, "logs", "basic_analysis.log")
-    run:
-        input_arg = f"--input {input.data}" if input else f"--input {INPUT_PATH}"
-        shell(f"""
+    shell:
+        """
         Rscript {params.script} \
-            {input_arg} \
+            {params.input_flag} {input.data} \
             --output {output} \
-            --species {SPECIES} \
+            --species {params.species} \
             --min_features {params.min_features} \
             --max_features {params.max_features} \
             --max_mt {params.max_mt} \
@@ -355,42 +360,42 @@ rule basic_analysis:
             --threads {threads} \
             {params.extra} \
             2>&1 | tee {log}
-        """)
+        """
 
 rule sctransform:
-    """Run SCTransform analysis (script 02) - entry point for 'sctransform'/'full' workflow."""
+    """Run SCTransform analysis (script 02) - entry point for the 'sctransform', 'cell_cycle' and 'full' workflows."""
     input:
         data = data_input(INPUT_PATH)
     output:
         directory(step_dir("sctransform"))
     params:
         script = get_script_path("02_sctransform.R"),
+        species = SPECIES,
+        input_flag = "--input" if data_input(INPUT_PATH) else "",
         n_features = config.get("sctransform", {}).get("n_variable_features", 3000),
         resolution = config.get("sctransform", {}).get("resolution", 0.5),
         dims = config.get("sctransform", {}).get("dims_use", "1:30"),
-        vars_to_regress = config.get("sctransform", {}).get("vars_to_regress", ""),
+        vars_to_regress = optional_arg("--vars_to_regress", config.get("sctransform", {}).get("vars_to_regress", "")),
         extra = config.get("sctransform", {}).get("extra_args", "")
     threads: rule_threads("sctransform", THREADS)
     resources:
         **rule_resources("sctransform")
     log:
         os.path.join(OUTPUT_DIR, "logs", "sctransform.log")
-    run:
-        input_arg = f"--input {input.data}" if input else f"--input {INPUT_PATH}"
-        vars_regress_arg = f'--vars_to_regress "{params.vars_to_regress}"' if params.vars_to_regress else ""
-        shell(f"""
+    shell:
+        """
         Rscript {params.script} \
-            {input_arg} \
+            {params.input_flag} {input.data} \
             --output {output} \
-            --species {SPECIES} \
+            --species {params.species} \
             --n_variable_features {params.n_features} \
             --resolution {params.resolution} \
             --dims_use "{params.dims}" \
             --threads {threads} \
-            {vars_regress_arg} \
+            {params.vars_to_regress} \
             {params.extra} \
             2>&1 | tee {log}
-        """)
+        """
 
 rule integration:
     """Run integration analysis (script 03) - entry point for 'integration' workflow."""
@@ -400,44 +405,43 @@ rule integration:
         directory(step_dir("integration"))
     params:
         script = get_script_path("03_integration.R"),
+        species = SPECIES,
+        # The script reads a list of the samples where this job sees them
+        # (local copies when they come from cloud storage), written below.
+        # Nothing for the demo. A function, so the list is only read when
+        # integration runs.
+        list_arg = lambda wildcards: '--input_list "$list"' if integration_samples() else "",
         method = config.get("integration", {}).get("method", "CCAIntegration"),
         normalization = config.get("integration", {}).get("normalization", "LogNormalize"),
         resolution = config.get("integration", {}).get("resolution", 0.5),
         dims = config.get("integration", {}).get("dims_use", "1:30"),
-        sample_names = config.get("integration", {}).get("sample_names", ""),
-        conditions = config.get("integration", {}).get("conditions", ""),
+        sample_names = optional_arg("--sample_names", config.get("integration", {}).get("sample_names", "")),
+        conditions = optional_arg("--conditions", config.get("integration", {}).get("conditions", "")),
         extra = config.get("integration", {}).get("extra_args", "")
     threads: rule_threads("integration", THREADS)
     resources:
         **rule_resources("integration")
     log:
         os.path.join(OUTPUT_DIR, "logs", "integration.log")
-    run:
-        # The script gets a list of the samples where this job sees them
-        # (local copies when they come from cloud storage)
-        if input.samples:
-            fd, list_path = tempfile.mkstemp(prefix="samples_", suffix=".txt")
-            with os.fdopen(fd, "w") as f:
-                f.write("\n".join(str(s) for s in input.samples) + "\n")
-        else:
-            list_path = INPUT_LIST
-        sample_arg = f'--sample_names "{params.sample_names}"' if params.sample_names else ""
-        cond_arg = f'--conditions "{params.conditions}"' if params.conditions else ""
-        shell(f"""
+    shell:
+        """
+        list=$(mktemp)
+        trap 'rm -f "$list"' EXIT
+        printf '%s\\n' {input.samples:q} > "$list"
         Rscript {params.script} \
-            --input_list {list_path} \
+            {params.list_arg} \
             --output {output} \
-            --species {SPECIES} \
+            --species {params.species} \
             --method {params.method} \
             --normalization {params.normalization} \
             --resolution {params.resolution} \
             --dims_use "{params.dims}" \
             --threads {threads} \
-            {sample_arg} \
-            {cond_arg} \
+            {params.sample_names} \
+            {params.conditions} \
             {params.extra} \
             2>&1 | tee {log}
-        """)
+        """
 
 # -----------------------------------------------------------------------------
 # Cell Cycle Rule
@@ -451,6 +455,8 @@ rule cell_cycle:
         directory(step_dir("cell_cycle"))
     params:
         script = get_script_path("05_cell_cycle.R"),
+        species = SPECIES,
+        rds = STEP_RDS[entry_step()],
         regress = "--regress_cc" if config.get("cell_cycle", {}).get("regress", False) else "",
         regress_diff = "--regress_cc_difference" if config.get("cell_cycle", {}).get("regress_difference", False) else "",
         extra = config.get("cell_cycle", {}).get("extra_args", "")
@@ -459,17 +465,17 @@ rule cell_cycle:
         **rule_resources("cell_cycle")
     log:
         os.path.join(OUTPUT_DIR, "logs", "cell_cycle.log")
-    run:
-        shell(f"""
+    shell:
+        """
         Rscript {params.script} \
-            --input {step_rds(input.step, entry_step())} \
+            --input {input.step}/{params.rds} \
             --output {output} \
-            --species {SPECIES} \
+            --species {params.species} \
             {params.regress} \
             {params.regress_diff} \
             {params.extra} \
             2>&1 | tee {log}
-        """)
+        """
 
 # -----------------------------------------------------------------------------
 # Differential Expression Rule
@@ -483,6 +489,7 @@ rule differential_expression:
         directory(step_dir("differential_expression"))
     params:
         script = get_script_path("04_differential_expression.R"),
+        rds = STEP_RDS[analysis_step()],
         mode = config.get("de", {}).get("mode", "all_markers"),
         test = config.get("de", {}).get("test_use", "wilcox"),
         logfc = config.get("de", {}).get("logfc_threshold", 0.25),
@@ -493,10 +500,10 @@ rule differential_expression:
         **rule_resources("differential_expression")
     log:
         os.path.join(OUTPUT_DIR, "logs", "differential_expression.log")
-    run:
-        shell(f"""
+    shell:
+        """
         Rscript {params.script} \
-            --input {step_rds(input.step, analysis_step())} \
+            --input {input.step}/{params.rds} \
             --output {output} \
             --mode {params.mode} \
             --test_use {params.test} \
@@ -505,7 +512,7 @@ rule differential_expression:
             --threads {threads} \
             {params.extra} \
             2>&1 | tee {log}
-        """)
+        """
 
 # -----------------------------------------------------------------------------
 # Visualization Rule
@@ -520,42 +527,41 @@ rule visualization:
         directory(step_dir("visualization"))
     params:
         script = get_script_path("06_visualization.R"),
+        rds = STEP_RDS[analysis_step()],
         reduction = config.get("visualization", {}).get("reduction", "umap"),
-        features = config.get("visualization", {}).get("features", ""),
+        features = optional_arg("--features", config.get("visualization", {}).get("features", "")),
         extra = config.get("visualization", {}).get("extra_args", "")
     threads: rule_threads("visualization", 1)
     resources:
         **rule_resources("visualization")
     log:
         os.path.join(OUTPUT_DIR, "logs", "visualization.log")
-    run:
-        features_arg = f'--features "{params.features}"' if params.features else ""
-        marker_file = os.path.join(input.de, "de_results_significant.csv")
-        shell(f"""
+    shell:
+        """
         Rscript {params.script} \
-            --input {step_rds(input.step, analysis_step())} \
+            --input {input.step}/{params.rds} \
             --output {output} \
-            --marker_file {marker_file} \
+            --marker_file {input.de}/de_results_significant.csv \
             --reduction {params.reduction} \
-            {features_arg} \
+            {params.features} \
             {params.extra} \
             2>&1 | tee {log}
-        """)
+        """
 
 # -----------------------------------------------------------------------------
 # Sample-Level Analysis Rule (scSLIDE, Seurat >= 6)
 # -----------------------------------------------------------------------------
 
 SAMPLE_LEVEL = config.get("sample_level", {})
+SAMPLE_LEVEL_RDS = SAMPLE_LEVEL.get("input_rds", "")
 
 def get_sample_level_input(wildcards):
     """An existing Seurat RDS (sample_level.input_rds), nothing for the demo,
     or the integration output folder."""
-    rds = SAMPLE_LEVEL.get("input_rds", "")
-    if rds == "DEMO":
+    if SAMPLE_LEVEL_RDS == "DEMO":
         return []
-    if rds:
-        return data_input(rds)
+    if SAMPLE_LEVEL_RDS:
+        return data_input(SAMPLE_LEVEL_RDS)
     return step_dir("integration")
 
 rule sample_level:
@@ -566,44 +572,42 @@ rule sample_level:
         directory(step_dir("sample_level"))
     params:
         script = get_script_path("07_sample_level.R"),
+        # The integration output folder holds this object
+        integrated_rds = STEP_RDS["integration"],
         # Defaults match the metadata written by 03_integration.R
         sample_col = SAMPLE_LEVEL.get("sample_col", "sample"),
         response = SAMPLE_LEVEL.get("response", "condition"),
-        celltype_col = SAMPLE_LEVEL.get("celltype_col", "seurat_clusters"),
+        celltype_col = optional_arg("--celltype_col", SAMPLE_LEVEL.get("celltype_col", "seurat_clusters")),
         reduction = SAMPLE_LEVEL.get("reduction", "integrated"),
         dims = SAMPLE_LEVEL.get("dims", "1:30"),
         traj_dcs = SAMPLE_LEVEL.get("traj_dcs", "1"),
-        latent_vars = SAMPLE_LEVEL.get("latent_vars", ""),
+        latent_vars = optional_arg("--latent_vars", SAMPLE_LEVEL.get("latent_vars", "")),
         extra = SAMPLE_LEVEL.get("extra_args", "")
     threads: rule_threads("sample_level", THREADS)
     resources:
         **rule_resources("sample_level")
     log:
         os.path.join(OUTPUT_DIR, "logs", "sample_level.log")
-    run:
-        if len(input) == 0:
-            input_arg = ""
-        elif os.path.isdir(input.rds):
-            input_arg = f"--input {step_rds(input.rds, 'integration')}"
-        else:
-            input_arg = f"--input {input.rds}"
-        celltype_arg = f'--celltype_col "{params.celltype_col}"' if params.celltype_col else ""
-        latent_arg = f'--latent_vars "{params.latent_vars}"' if params.latent_vars else ""
-        shell(f"""
+    shell:
+        """
+        # The RDS, or the object in the integration output folder; no
+        # --input for the demo
+        rds={input.rds:q}
+        if [ -d "$rds" ]; then rds="$rds/{params.integrated_rds}"; fi
         Rscript {params.script} \
-            {input_arg} \
+            ${{rds:+--input "$rds"}} \
             --output {output} \
             --sample_col "{params.sample_col}" \
             --response "{params.response}" \
-            {celltype_arg} \
+            {params.celltype_col} \
             --reduction {params.reduction} \
             --dims "{params.dims}" \
             --traj_dcs "{params.traj_dcs}" \
-            {latent_arg} \
+            {params.latent_vars} \
             --threads {threads} \
             {params.extra} \
             2>&1 | tee {log}
-        """)
+        """
 
 # -----------------------------------------------------------------------------
 # Spatial Rule (Xenium / Atera, Seurat >= 6)
@@ -620,8 +624,8 @@ rule spatial:
     params:
         script = get_script_path("08_spatial.R"),
         platform = SPATIAL.get("platform", "auto"),
-        molecules = SPATIAL.get("molecules", ""),
-        crop = SPATIAL.get("crop", ""),
+        molecules = optional_arg("--molecules", SPATIAL.get("molecules", "")),
+        crop = optional_arg("--crop", SPATIAL.get("crop", "")),
         normalization = SPATIAL.get("normalization", "SCT"),
         resolution = SPATIAL.get("resolution", 0.3),
         extra = SPATIAL.get("extra_args", "")
@@ -630,22 +634,20 @@ rule spatial:
         **rule_resources("spatial")
     log:
         os.path.join(OUTPUT_DIR, "logs", "spatial.log")
-    run:
-        molecules_arg = f'--molecules "{params.molecules}"' if params.molecules else ""
-        crop_arg = f'--crop "{params.crop}"' if params.crop else ""
-        shell(f"""
+    shell:
+        """
         Rscript {params.script} \
             --input {input.data} \
             --output {output} \
             --platform {params.platform} \
             --normalization {params.normalization} \
             --resolution {params.resolution} \
-            {molecules_arg} \
-            {crop_arg} \
+            {params.molecules} \
+            {params.crop} \
             --threads {threads} \
             {params.extra} \
             2>&1 | tee {log}
-        """)
+        """
 
 # -----------------------------------------------------------------------------
 # Utility Rules
@@ -653,12 +655,16 @@ rule spatial:
 
 rule clean:
     """Remove all output files."""
+    log:
+        os.path.join("logs", "clean.log")
     shell:
-        f"rm -rf {OUTPUT_DIR}"
+        f"rm -rfv {OUTPUT_DIR} > {{log}} 2>&1"
 
 rule dag:
     """Generate DAG visualization."""
     output:
         "dag.png"
+    log:
+        os.path.join("logs", "dag.log")
     shell:
-        "snakemake --dag | dot -Tpng > {output}"
+        "snakemake --dag 2> {log} | dot -Tpng > {output} 2>> {log}"
