@@ -137,7 +137,7 @@ validate_cluster_assignments <- function(output_dir) {
     all_numeric,
     "Cluster values are integers",
     if (!all_numeric) sprintf("Non-integer cluster values found: %s",
-                               paste(head(unique(cluster_values[is.na(numeric_check)])), collapse = ", "))
+                              paste(head(unique(cluster_values[is.na(numeric_check)])), collapse = ", "))
   )
 
   if (!all_numeric) {
@@ -264,7 +264,8 @@ validate_figures <- function(output_dir, n_sample = 20000) {
   if (!requireNamespace("png", quietly = TRUE)) {
     results[["png_package"]] <- validation_result(
       FALSE, "Figure content check (png package)",
-      "Install the 'png' R package to check figures for content")
+      "Install the 'png' R package to check figures for content"
+    )
     return(results)
   }
 
@@ -287,8 +288,8 @@ validate_figures <- function(output_dir, n_sample = 20000) {
 #' @param expected_assays Character vector of expected assay names
 #' @param expect_clusters Whether the object should have seurat_clusters
 validate_seurat_object <- function(rds_path, expected_reductions = c("pca", "umap"),
-                                    expected_assays = c("RNA"),
-                                    expect_clusters = TRUE) {
+                                   expected_assays = c("RNA"),
+                                   expect_clusters = TRUE) {
   results <- list()
 
   if (!file.exists(rds_path)) {
@@ -493,11 +494,11 @@ validate_demo_expectations <- function(output_dir, script_name) {
           found_markers <- sum(expectations$expected_markers %in% markers$gene)
           enough_found <- found_markers >= expectations$min_markers_found
 
+          found_genes <- expectations$expected_markers[expectations$expected_markers %in% markers$gene]
           results[["expected_markers_found"]] <- validation_result(
             enough_found,
             sprintf("Expected marker genes found (%d/%d required)", found_markers, expectations$min_markers_found),
-            if (!enough_found) sprintf("Found: %s",
-                                        paste(expectations$expected_markers[expectations$expected_markers %in% markers$gene], collapse = ", "))
+            if (!enough_found) sprintf("Found: %s", paste(found_genes, collapse = ", "))
           )
         }
         break
@@ -518,7 +519,7 @@ validate_demo_expectations <- function(output_dir, script_name) {
           all_found,
           "Expected samples present in output",
           if (!all_found) sprintf("Missing samples: %s",
-                                   paste(setdiff(expectations$expected_samples, found_samples), collapse = ", "))
+                                  paste(setdiff(expectations$expected_samples, found_samples), collapse = ", "))
         )
       }
     }
@@ -537,7 +538,7 @@ validate_demo_expectations <- function(output_dir, script_name) {
           all_found,
           "Expected cell cycle phases present",
           if (!all_found) sprintf("Missing phases: %s",
-                                   paste(setdiff(expectations$expected_phases, found_phases), collapse = ", "))
+                                  paste(setdiff(expectations$expected_phases, found_phases), collapse = ", "))
         )
       }
     }
@@ -599,7 +600,8 @@ validate_demo_expectations <- function(output_dir, script_name) {
       )
     } else {
       results[["expected_traj_genes"]] <- validation_result(
-        FALSE, "Trajectory DE results exist", sprintf("Missing %s", expectations$traj_de_file))
+        FALSE, "Trajectory DE results exist", sprintf("Missing %s", expectations$traj_de_file)
+      )
     }
   }
 
@@ -635,13 +637,13 @@ run_tier1_validation <- function(output_dir, script_name) {
     "01_basic_analysis" = c("seurat_object.rds", "cluster_assignments.csv", "cluster_markers_all.csv",
                             "parameters.csv", "session_info.txt"),
     "02_sctransform" = c("seurat_sctransform.rds", "cluster_assignments.csv", "cluster_markers_all.csv",
-                          "parameters.csv", "session_info.txt"),
-    "03_integration" = c("seurat_integrated.rds", "cluster_assignments.csv", "cluster_markers_all.csv",
-                          "parameters.csv", "session_info.txt"),
-    "04_differential_expression" = c("de_results_all.csv", "de_results_significant.csv",
-                                      "parameters.csv", "session_info.txt"),
-    "05_cell_cycle" = c("seurat_cell_cycle.rds", "cell_cycle_scores.csv",
                          "parameters.csv", "session_info.txt"),
+    "03_integration" = c("seurat_integrated.rds", "cluster_assignments.csv", "cluster_markers_all.csv",
+                         "parameters.csv", "session_info.txt"),
+    "04_differential_expression" = c("de_results_all.csv", "de_results_significant.csv",
+                                     "parameters.csv", "session_info.txt"),
+    "05_cell_cycle" = c("seurat_cell_cycle.rds", "cell_cycle_scores.csv",
+                        "parameters.csv", "session_info.txt"),
     "06_visualization" = c("visualization_summary.md", "parameters.csv", "session_info.txt"),
     "07_sample_level" = c("sample_object.rds", "sample_embedding.csv", "traj_de_summary.csv",
                           "parameters.csv", "session_info.txt"),

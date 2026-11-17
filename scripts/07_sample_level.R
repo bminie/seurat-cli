@@ -140,7 +140,8 @@ option_list <- list(
 
 parser <- OptionParser(
   option_list = option_list,
-  description = "\nSample-level analysis with scSLIDE (Seurat >= 6): landmark density per sample, diffusion map trajectories, and trajectory DE.",
+  description = paste("\nSample-level analysis with scSLIDE (Seurat >= 6): landmark density per sample,",
+                      "diffusion map trajectories, and trajectory DE."),
   epilogue = paste(
     "Examples:",
     "  Rscript 07_sample_level.R --demo --output ./demo_results",
@@ -526,7 +527,8 @@ for (ct in celltypes) {
                         ct, ncol(ct_bulk), args$min_samples), log_env)
     de_summary[[length(de_summary) + 1]] <- data.frame(
       celltype = ct, component = NA, n_samples = ncol(ct_bulk), n_tested = 0,
-      n_significant = 0, status = "too few samples")
+      n_significant = 0, status = "too few samples"
+    )
     next
   }
 
@@ -540,11 +542,13 @@ for (ct in celltypes) {
       error = function(e) {
         log_message(sprintf("    failed: %s", conditionMessage(e)), log_env)
         NULL
-      })
+      }
+    )
     if (is.null(de)) {
       de_summary[[length(de_summary) + 1]] <- data.frame(
         celltype = ct, component = paste0("DC", k), n_samples = ncol(ct_bulk), n_tested = 0,
-        n_significant = 0, status = "failed")
+        n_significant = 0, status = "failed"
+      )
       next
     }
 
@@ -554,7 +558,8 @@ for (ct in celltypes) {
     sig <- de[!is.na(de$adj_pval) & de$adj_pval < args$fdr, ]
     de_summary[[length(de_summary) + 1]] <- data.frame(
       celltype = ct, component = paste0("DC", k), n_samples = ncol(ct_bulk),
-      n_tested = nrow(de), n_significant = nrow(sig), status = "tested")
+      n_tested = nrow(de), n_significant = nrow(sig), status = "tested"
+    )
     log_message(sprintf("    %d genes tested, %d with adjusted p < %.2f",
                         nrow(de), nrow(sig), args$fdr), log_env)
 
@@ -572,7 +577,8 @@ for (ct in celltypes) {
       save_complex_heatmap(
         ht, sprintf("%02d_traj_heatmap_%s_DC%d.png", heatmap_index + 2, safe_name(ct), k),
         output_dir = args$output, width = max(7, ncol(hm_bulk) * 0.3 + 4),
-        height = max(5, length(hm_genes) * 0.18 + 3))
+        height = max(5, length(hm_genes) * 0.18 + 3)
+      )
     }
   }
 }

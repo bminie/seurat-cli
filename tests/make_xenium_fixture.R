@@ -71,7 +71,8 @@ pass <- transcripts$qv >= 20
 counts <- Matrix::sparseMatrix(
   i = match(transcripts$feature_name[pass], feature_names),
   j = match(transcripts$cell_id[pass], cells$cell_id),
-  x = 1, dims = c(length(feature_names), n_cells))
+  x = 1, dims = c(length(feature_names), n_cells)
+)
 cells$transcript_counts <- as.integer(Matrix::colSums(counts[seq_along(genes), ]))
 cells$total_counts <- as.integer(Matrix::colSums(counts))
 cells$cell_area <- 65

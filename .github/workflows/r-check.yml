@@ -27,7 +27,10 @@ jobs:
     
     - name: Install dependencies
       run: |
-        install.packages(c("optparse", "lintr"))
+        # lintr is pinned so a new release (with new checks) can't fail the
+        # build without a code change
+        install.packages(c("optparse", "remotes"))
+        remotes::install_version("lintr", version = "3.4.0", upgrade = "never")
       shell: Rscript {0}
     
     - name: Check R syntax
@@ -61,7 +64,11 @@ jobs:
         linters <- linters_with_defaults(
           line_length_linter = line_length_linter(120),
           object_name_linter = NULL,  # Allow flexible naming
-          commented_code_linter = NULL  # Allow commented examples
+          commented_code_linter = NULL,  # Allow commented examples
+          # Needs every package the scripts load (Seurat, ggplot2, ...)
+          # installed to know their functions, and flags column names in
+          # aes() and subset(). Without them it only reports false positives.
+          object_usage_linter = NULL
         )
         
         files <- list.files(pattern = "\\.R$", recursive = TRUE, full.names = TRUE)
@@ -79,12 +86,11 @@ jobs:
             message(paste("\n", f, ":"))
             print(all_lints[[f]])
           }
-          message("\nLint warnings found (non-blocking)")
+          stop("Lint issues found (see above)")
         } else {
           message("No lint issues found!")
         }
       shell: Rscript {0}
-      continue-on-error: true  # Lint warnings don't fail the build
 
   help-check:
     runs-on: ubuntu-latest

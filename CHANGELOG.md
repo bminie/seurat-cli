@@ -57,6 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Snakemake default memory is in MiB (8192, 6144, 16384 instead of 8000, 6000, 16000), matching Nextflow's 8 GB / 16 GB; on AWS Batch, memory and threads are rounded up to sizes it accepts
 - Snakemake rules run plain shell commands (optional arguments are built in `params`), so `snakemake --lint` reports nothing; the image's scripts path is the `container_scripts_dir` setting; demo runs no longer pass `--input DEMO`. CI pins Snakemake 9.27.1 and fails on lint findings
 - GitHub Actions: every workflow pins its actions to commit SHAs, updated to the latest releases (checkout v7, setup-python v7, upload-artifact v7, setup-micromamba v3, setup-nextflow v3, setup-r v2.14, and the Docker actions' current majors), all on Node 24. The test workflows get a read-only token and don't keep git credentials after checkout
+- R code passes lintr with no findings (indentation, line length, operator spacing, implicit returns; formatting only). The R Syntax Check workflow pins lintr 3.4.0, turns off `object_usage_linter` (it needs Seurat and the other packages installed, and otherwise reports only false positives), and now fails on lint findings
 - Sample lists (`--input_list`) skip `#` comment lines
 - Snakemake finds the scripts relative to the Snakefile, not the launch directory
 - Snakemake demo config only passes `--demo` to entry-point steps, so downstream steps use upstream outputs; demo can now run the `basic` and `integration` workflows

@@ -67,9 +67,11 @@ option_list <- list(
   make_option("--min_features", type = "integer", default = 200,
               help = "Minimum features per cell [default: %default]"),
   make_option("--max_features", type = "integer", default = NULL,
-              help = "Maximum features per cell (default: no limit). Setting this or --max_mt filters cells before SCTransform"),
+              help = paste("Maximum features per cell (default: no limit).",
+                           "Setting this or --max_mt filters cells before SCTransform")),
   make_option("--max_mt", type = "double", default = NULL,
-              help = "Maximum percent mitochondrial (default: no limit). Setting this or --max_features filters cells before SCTransform"),
+              help = paste("Maximum percent mitochondrial (default: no limit).",
+                           "Setting this or --max_features filters cells before SCTransform")),
 
   # SCTransform Parameters
   make_option("--n_variable_features", type = "integer", default = 3000,
@@ -307,8 +309,8 @@ save_plot(p_umap, "05_umap_clusters.png", output_dir = args$output, width = 10, 
 
 # Feature plots for QC metrics
 p_qc_umap <- FeaturePlot(seurat_obj,
-                          features = c("nFeature_RNA", "nCount_RNA", "percent.mt"),
-                          ncol = 3)
+                         features = c("nFeature_RNA", "nCount_RNA", "percent.mt"),
+                         ncol = 3)
 save_plot(p_qc_umap, "06_umap_qc_features.png", output_dir = args$output,
           width = 15, height = 5)
 

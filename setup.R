@@ -65,14 +65,14 @@ install_if_missing <- function(pkg, source = "CRAN", repo = NULL) {
 
     if (requireNamespace(pkg, quietly = TRUE)) {
       cat(sprintf("    ✓ %s installed successfully\n", pkg))
-      return(TRUE)
+      TRUE
     } else {
       cat(sprintf("    ✗ %s installation failed\n", pkg))
-      return(FALSE)
+      FALSE
     }
   } else {
     cat(sprintf("  ✓ %s already installed\n", pkg))
-    return(TRUE)
+    TRUE
   }
 }
 
@@ -96,7 +96,8 @@ install_destiny <- function() {
     on.exit(options(old))
     remotes::install_url(
       "https://bioconductor.org/packages/3.23/bioc/src/contrib/destiny_3.26.0.tar.gz",
-      dependencies = NA, upgrade = "never", quiet = TRUE)
+      dependencies = NA, upgrade = "never", quiet = TRUE
+    )
   }, error = function(e) cat(sprintf("    Error: %s\n", e$message)))
 
   ok <- requireNamespace("destiny", quietly = TRUE)
@@ -121,11 +122,11 @@ install_seurat_dataset <- function(dataset_name) {
       }
     }, error = function(e) {
       cat(sprintf("    ✗ %s installation failed: %s\n", dataset_name, e$message))
-      return(FALSE)
+      FALSE
     })
   } else {
     cat(sprintf("  ✓ %s already installed\n", dataset_name))
-    return(TRUE)
+    TRUE
   }
 }
 

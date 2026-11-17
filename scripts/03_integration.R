@@ -89,7 +89,8 @@ option_list <- list(
 
   # Integration method
   make_option("--method", type = "character", default = "CCAIntegration",
-              help = "Integration method: CCAIntegration, RPCAIntegration, HarmonyIntegration, FastMNNIntegration [default: %default]"),
+              help = paste("Integration method: CCAIntegration, RPCAIntegration, HarmonyIntegration,",
+                           "FastMNNIntegration [default: %default]")),
   make_option("--reference", type = "integer", default = NULL,
               help = "Index of reference sample (1-based) for CCA/RPCA. NULL = no reference"),
   make_option("--k_anchor", type = "integer", default = 5,
@@ -220,8 +221,8 @@ if (args$method == "HarmonyIntegration") {
 }
 if (args$method == "FastMNNIntegration") {
   # FastMNNIntegration lives in SeuratWrappers (GitHub) and needs batchelor
-  missing_pkgs <- c("SeuratWrappers", "batchelor")[
-    !vapply(c("SeuratWrappers", "batchelor"), requireNamespace, logical(1), quietly = TRUE)]
+  fastmnn_pkgs <- c("SeuratWrappers", "batchelor")
+  missing_pkgs <- fastmnn_pkgs[!vapply(fastmnn_pkgs, requireNamespace, logical(1), quietly = TRUE)]
   if (length(missing_pkgs) > 0) {
     stop(sprintf(paste0("FastMNNIntegration needs: %s. Install with ",
                         "remotes::install_github('satijalab/seurat-wrappers') and ",
@@ -282,7 +283,7 @@ if (args$demo) {
     obj$sample <- sample_names[i]
     obj$orig.ident <- sample_names[i]
 
-    return(obj)
+    obj
   })
 
   names(seurat_list) <- sample_names
@@ -302,7 +303,7 @@ if (!is.null(args$conditions)) {
 
 # Validate reference sample index now that the number of samples is known
 if (!is.null(args$reference) &&
-    (args$reference < 1 || args$reference > length(seurat_list))) {
+      (args$reference < 1 || args$reference > length(seurat_list))) {
   stop(sprintf("--reference must be between 1 and %d", length(seurat_list)))
 }
 
@@ -323,11 +324,11 @@ seurat_list <- lapply(seurat_list, function(obj) {
   obj <- subset(
     obj,
     subset = nFeature_RNA > args$min_features &
-             nFeature_RNA < args$max_features &
-             percent.mt < args$max_mt
+      nFeature_RNA < args$max_features &
+      percent.mt < args$max_mt
   )
 
-  return(obj)
+  obj
 })
 
 for (nm in names(seurat_list)) {
@@ -375,8 +376,8 @@ if (args$normalization == "SCT") {
 } else {
   seurat_obj <- NormalizeData(seurat_obj, verbose = args$verbose)
   seurat_obj <- FindVariableFeatures(seurat_obj,
-                                      nfeatures = args$n_variable_features,
-                                      verbose = args$verbose)
+                                     nfeatures = args$n_variable_features,
+                                     verbose = args$verbose)
   seurat_obj <- ScaleData(seurat_obj, verbose = args$verbose)
 }
 
@@ -390,11 +391,11 @@ seurat_obj <- RunPCA(seurat_obj, npcs = args$n_pcs, verbose = args$verbose)
 
 # UMAP before integration
 seurat_obj <- RunUMAP(seurat_obj, dims = dims_use, reduction.name = "umap.unintegrated",
-                       uwot.init = args$umap_init,
-                       verbose = args$verbose)
+                      uwot.init = args$umap_init,
+                      verbose = args$verbose)
 
 p_pre_integration <- DimPlot(seurat_obj, reduction = "umap.unintegrated",
-                              group.by = "orig.ident") +
+                             group.by = "orig.ident") +
   ggtitle("Before Integration")
 
 save_plot(p_pre_integration, "02_umap_before_integration.png",
@@ -465,7 +466,7 @@ seurat_obj <- RunUMAP(
 
 # Comparison plot
 p_post_integration <- DimPlot(seurat_obj, reduction = "umap.integrated",
-                               group.by = "orig.ident") +
+                              group.by = "orig.ident") +
   ggtitle("After Integration")
 
 p_comparison <- p_pre_integration + p_post_integration
@@ -474,7 +475,7 @@ save_plot(p_comparison, "03_integration_comparison.png",
 
 # Split by sample
 p_split <- DimPlot(seurat_obj, reduction = "umap.integrated",
-                    split.by = "orig.ident", ncol = min(length(sample_names), 4))
+                   split.by = "orig.ident", ncol = min(length(sample_names), 4))
 save_plot(p_split, "04_umap_split_by_sample.png",
           output_dir = args$output,
           width = min(length(sample_names), 4) * 5, height = 5)
@@ -488,17 +489,17 @@ log_message("Clustering integrated data...", log_env)
 # Use explicit graph name for consistency
 graph_name <- "integrated_snn"
 seurat_obj <- FindNeighbors(seurat_obj, reduction = "integrated",
-                             dims = dims_use,
-                             graph.name = c(paste0(graph_name, "_nn"), graph_name),
-                             verbose = args$verbose)
+                            dims = dims_use,
+                            graph.name = c(paste0(graph_name, "_nn"), graph_name),
+                            verbose = args$verbose)
 
 # Run clustering at specified resolution(s)
 for (res in resolutions) {
   log_message(sprintf("  Clustering at resolution %.2f", res), log_env)
 
   seurat_obj <- FindClusters(seurat_obj, resolution = res,
-                              graph.name = graph_name,
-                              verbose = args$verbose)
+                             graph.name = graph_name,
+                             verbose = args$verbose)
 }
 
 # Use primary resolution for default clustering
@@ -512,7 +513,7 @@ log_message(sprintf("Found %d clusters at resolution %.2f",
 
 # Cluster visualization
 p_clusters <- DimPlot(seurat_obj, reduction = "umap.integrated",
-                       label = TRUE, label.size = 4) +
+                      label = TRUE, label.size = 4) +
   ggtitle(sprintf("Integrated Clusters (res=%.2f)", args$resolution))
 
 save_plot(p_clusters, "05_umap_clusters.png",
@@ -520,8 +521,8 @@ save_plot(p_clusters, "05_umap_clusters.png",
 
 # Clusters by sample
 p_clusters_split <- DimPlot(seurat_obj, reduction = "umap.integrated",
-                             split.by = "orig.ident", label = TRUE, label.size = 3,
-                             ncol = min(length(sample_names), 4))
+                            split.by = "orig.ident", label = TRUE, label.size = 3,
+                            ncol = min(length(sample_names), 4))
 save_plot(p_clusters_split, "06_clusters_by_sample.png",
           output_dir = args$output,
           width = min(length(sample_names), 4) * 5, height = 5)

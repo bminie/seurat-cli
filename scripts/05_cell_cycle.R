@@ -174,7 +174,7 @@ load_gene_list <- function(input, default_genes) {
     genes <- trimws(strsplit(input, ",")[[1]])
   }
 
-  return(genes)
+  genes
 }
 
 # Get default gene sets
@@ -251,16 +251,16 @@ if (needs_preprocessing) {
 
   # Filter
   seurat_obj <- filter_cells(seurat_obj,
-                              min_features = args$min_features,
-                              max_mt = args$max_mt)
+                             min_features = args$min_features,
+                             max_mt = args$max_mt)
 
   # Normalize
   seurat_obj <- NormalizeData(seurat_obj, verbose = args$verbose)
 
   # Variable features
   seurat_obj <- FindVariableFeatures(seurat_obj,
-                                      nfeatures = args$n_variable_features,
-                                      verbose = args$verbose)
+                                     nfeatures = args$n_variable_features,
+                                     verbose = args$verbose)
 }
 
 is_sct <- DefaultAssay(seurat_obj) == "SCT"
@@ -269,8 +269,8 @@ if (is_sct) {
 } else if (length(VariableFeatures(seurat_obj)) == 0) {
   log_message("No variable features found - running FindVariableFeatures", log_env)
   seurat_obj <- FindVariableFeatures(seurat_obj,
-                                      nfeatures = args$n_variable_features,
-                                      verbose = args$verbose)
+                                     nfeatures = args$n_variable_features,
+                                     verbose = args$verbose)
 }
 
 # Check which genes are in the dataset
@@ -290,7 +290,8 @@ if (length(g2m_genes_present) < 5) {
   log_message("WARNING: Very few G2M phase genes found in dataset. Cell cycle scoring may be unreliable.", log_env)
 }
 if (length(s_genes_present) == 0 || length(g2m_genes_present) == 0) {
-  log_message("ERROR: No cell cycle genes found for one or both phases. Check species setting or provide custom gene lists.", log_env)
+  log_message(paste("ERROR: No cell cycle genes found for one or both phases.",
+                    "Check species setting or provide custom gene lists."), log_env)
   stop("Insufficient cell cycle genes for scoring")
 }
 
@@ -343,7 +344,7 @@ if (!is_sct) {
   seurat_obj <- ScaleData(seurat_obj, verbose = args$verbose)
 }
 seurat_obj <- RunPCA(seurat_obj, features = VariableFeatures(seurat_obj),
-                      npcs = args$n_pcs, verbose = args$verbose)
+                     npcs = args$n_pcs, verbose = args$verbose)
 
 # PCA colored by phase
 p_pca_phase <- DimPlot(seurat_obj, reduction = "pca", group.by = "Phase") +
@@ -360,8 +361,8 @@ save_plot(p_pca_s + p_pca_g2m, "02_pca_scores_before.png",
 
 # UMAP
 seurat_obj <- RunUMAP(seurat_obj, dims = dims_use, reduction.name = "umap_before",
-                       uwot.init = args$umap_init,
-                       verbose = args$verbose)
+                      uwot.init = args$umap_init,
+                      verbose = args$verbose)
 
 p_umap_phase <- DimPlot(seurat_obj, reduction = "umap_before", group.by = "Phase") +
   ggtitle("UMAP - Before CC Regression")
@@ -422,8 +423,8 @@ if (args$regress_cc || args$regress_cc_difference) {
 
   # Re-run PCA
   seurat_obj <- RunPCA(seurat_obj, features = VariableFeatures(seurat_obj),
-                        npcs = args$n_pcs, reduction.name = "pca_regressed",
-                        verbose = args$verbose)
+                       npcs = args$n_pcs, reduction.name = "pca_regressed",
+                       verbose = args$verbose)
 
   # Visualize after regression
   log_message("Generating post-regression visualizations...", log_env)
@@ -434,10 +435,10 @@ if (args$regress_cc || args$regress_cc_difference) {
 
   # UMAP after regression
   seurat_obj <- RunUMAP(seurat_obj, dims = dims_use,
-                         reduction = "pca_regressed",
-                         reduction.name = "umap_after",
-                         uwot.init = args$umap_init,
-                         verbose = args$verbose)
+                        reduction = "pca_regressed",
+                        reduction.name = "umap_after",
+                        uwot.init = args$umap_init,
+                        verbose = args$verbose)
 
   p_umap_phase_after <- DimPlot(seurat_obj, reduction = "umap_after", group.by = "Phase") +
     ggtitle("UMAP - After CC Regression")
@@ -463,7 +464,7 @@ if (args$regress_cc || args$regress_cc_difference) {
 log_message("Clustering...", log_env)
 
 seurat_obj <- FindNeighbors(seurat_obj, reduction = default_reduction,
-                             dims = dims_use, verbose = args$verbose)
+                            dims = dims_use, verbose = args$verbose)
 seurat_obj <- FindClusters(seurat_obj, resolution = args$resolution, verbose = args$verbose)
 
 n_clusters <- length(unique(seurat_obj$seurat_clusters))

@@ -53,11 +53,12 @@ seurat_min_version <- "6.0.0"
 check_seurat_version <- function() {
   installed <- utils::packageVersion("Seurat")
   if (installed < seurat_min_version) {
-    stop(sprintf(paste0(
+    msg <- paste0(
       "Seurat >= %s is required, but %s is installed.\n",
       "Upgrade it with: Rscript install_seurat.R (from the seurat-cli directory).\n",
-      "conda-forge may not have Seurat %s yet; the script installs it from CRAN."),
-      seurat_min_version, installed, seurat_min_version), call. = FALSE)
+      "conda-forge may not have Seurat %s yet; the script installs it from CRAN."
+    )
+    stop(sprintf(msg, seurat_min_version, installed, seurat_min_version), call. = FALSE)
   }
   invisible(installed)
 }
@@ -204,10 +205,10 @@ add_ifnb_donor_ids <- function(ifnb) {
 #' @param min_features Minimum features per cell
 #' @return Seurat object
 load_seurat_data <- function(input_path,
-                              input_format = "auto",
-                              sample_name = "Sample",
-                              min_cells = 3,
-                              min_features = 200) {
+                             input_format = "auto",
+                             sample_name = "Sample",
+                             min_cells = 3,
+                             min_features = 200) {
 
   # Auto-detect format
   if (input_format == "auto") {
@@ -272,7 +273,7 @@ load_seurat_data <- function(input_path,
     )
   }
 
-  return(seurat_obj)
+  seurat_obj
 }
 
 #' Detect input format from file path
@@ -328,7 +329,7 @@ calculate_qc_metrics <- function(seurat_obj, species = "human") {
   )
   seurat_obj[["percent.ribo"]] <- PercentageFeatureSet(seurat_obj, pattern = rp_pattern)
 
-  return(seurat_obj)
+  seurat_obj
 }
 
 #' Filter cells based on QC metrics
@@ -339,24 +340,24 @@ calculate_qc_metrics <- function(seurat_obj, species = "human") {
 #' @param max_mt Maximum percent mitochondrial
 #' @return Filtered Seurat object
 filter_cells <- function(seurat_obj,
-                          min_features = 200,
-                          max_features = Inf,
-                          max_mt = 5) {
+                         min_features = 200,
+                         max_features = Inf,
+                         max_mt = 5) {
 
   n_before <- ncol(seurat_obj)
 
   seurat_obj <- subset(
     seurat_obj,
     subset = nFeature_RNA > min_features &
-             nFeature_RNA < max_features &
-             percent.mt < max_mt
+      nFeature_RNA < max_features &
+      percent.mt < max_mt
   )
 
   n_after <- ncol(seurat_obj)
   message(sprintf("Filtered cells: %d -> %d (removed %d)",
                   n_before, n_after, n_before - n_after))
 
-  return(seurat_obj)
+  seurat_obj
 }
 
 # -----------------------------------------------------------------------------
@@ -382,11 +383,11 @@ save_seurat <- function(seurat_obj, output_path, compress = TRUE) {
 #' @param height Plot height in inches
 #' @param dpi Resolution
 save_plot <- function(plot,
-                       filename,
-                       output_dir = "output",
-                       width = 10,
-                       height = 8,
-                       dpi = 300) {
+                      filename,
+                      output_dir = "output",
+                      width = 10,
+                      height = 8,
+                      dpi = 300) {
 
   if (!dir.exists(output_dir)) {
     dir.create(output_dir, recursive = TRUE)
@@ -403,7 +404,7 @@ save_plot <- function(plot,
     dpi = dpi
   )
 
-  return(output_path)
+  output_path
 }
 
 #' Save a ComplexHeatmap object (e.g. from PlotAnnotatedHeatmap()) as a PNG
@@ -448,7 +449,8 @@ scale_for_heatmap <- function(seurat_obj, features) {
   features <- intersect(unique(features), rownames(seurat_obj[[assay]]))
   scaled <- tryCatch(
     rownames(LayerData(seurat_obj, assay = assay, layer = "scale.data")),
-    error = function(e) character())
+    error = function(e) character()
+  )
   missing <- setdiff(features, scaled)
 
   if (length(missing) == 0) {
@@ -480,7 +482,7 @@ create_output_dir <- function(base_dir = "output", prefix = "run") {
   output_dir <- file.path(base_dir, paste0(prefix, "_", timestamp))
   dir.create(output_dir, recursive = TRUE)
   message(sprintf("Created output directory: %s", output_dir))
-  return(output_dir)
+  output_dir
 }
 
 # -----------------------------------------------------------------------------
@@ -509,7 +511,7 @@ init_logging <- function(log_file = NULL, verbose = TRUE) {
     )
   }
 
-  return(log_env)
+  log_env
 }
 
 #' Log a message
@@ -562,7 +564,7 @@ get_common_parser <- function() {
                 help = "Suppress messages")
   )
 
-  return(OptionParser(option_list = option_list))
+  OptionParser(option_list = option_list)
 }
 
 #' UMAP initialization methods accepted by --umap_init

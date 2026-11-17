@@ -128,10 +128,11 @@ utils::install.packages(c(to_install, "Seurat"), repos = repos, type = pkg_type,
 # Check in a fresh R process, since this one may still have the old Seurat loaded
 rscript <- file.path(R.home("bin"), "Rscript")
 new_version <- suppressWarnings(system2(
-  rscript, c("-e", shQuote("cat(format(packageVersion('Seurat')))")), stdout = TRUE))
+  rscript, c("-e", shQuote("cat(format(packageVersion('Seurat')))")), stdout = TRUE
+))
 new_version <- tail(new_version, 1)
 if (length(new_version) == 0 || is.na(package_version(new_version, strict = FALSE)) ||
-    package_version(new_version) < min_version) {
+      package_version(new_version) < min_version) {
   stop("Seurat installation failed; see the messages above.", call. = FALSE)
 }
 cat(sprintf("\nSeurat %s installed.\n", new_version))

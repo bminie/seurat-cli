@@ -169,11 +169,11 @@ if (!is.null(args$crop)) {
 detect_platform <- function(dir) {
   has <- function(f) file.exists(file.path(dir, f))
   if (has("experiment.xenium") || has("cell_feature_matrix.h5") ||
-      dir.exists(file.path(dir, "cell_feature_matrix"))) {
+        dir.exists(file.path(dir, "cell_feature_matrix"))) {
     return("xenium")
   }
   if (has("experiment.spatial") || has("csc_cell_feature_matrix.zarr.zip") ||
-      has("cell_feature_matrix.zarr.zip")) {
+        has("cell_feature_matrix.zarr.zip")) {
     return("atera")
   }
   stop(sprintf(paste("Could not recognize %s as Xenium or Atera output",
@@ -209,8 +209,8 @@ load_seurat_deps(quiet = !args$verbose)
 setup_threads(args$threads, log_env)
 
 if (platform == "atera") {
-  missing_pkgs <- c("blosc", "jsonlite", "data.table")[
-    !vapply(c("blosc", "jsonlite", "data.table"), requireNamespace, logical(1), quietly = TRUE)]
+  atera_pkgs <- c("blosc", "jsonlite", "data.table")
+  missing_pkgs <- atera_pkgs[!vapply(atera_pkgs, requireNamespace, logical(1), quietly = TRUE)]
   if (length(missing_pkgs) > 0) {
     stop(sprintf("Reading Atera data needs: %s. Install with: Rscript setup.R --all",
                  paste(missing_pkgs, collapse = ", ")), call. = FALSE)
@@ -221,8 +221,8 @@ if (!is.null(crop) && !requireNamespace("sf", quietly = TRUE)) {
        call. = FALSE)
 }
 if (platform == "xenium" && file.exists(file.path(args$input, "transcripts.parquet")) &&
-    !file.exists(file.path(args$input, "transcripts.csv.gz")) &&
-    length(molecule_genes) > 0 && !requireNamespace("arrow", quietly = TRUE)) {
+      !file.exists(file.path(args$input, "transcripts.csv.gz")) &&
+      length(molecule_genes) > 0 && !requireNamespace("arrow", quietly = TRUE)) {
   stop("This Xenium folder stores transcripts as Parquet only; install the arrow package")
 }
 
@@ -300,7 +300,7 @@ if (ncol(seurat_obj) < 50) {
 p_spatial_qc <- ImageFeaturePlot(seurat_obj, fov = "fov", features = count_col, size = 0.5) +
   ggtitle("Transcripts per cell") |
   ImageFeaturePlot(seurat_obj, fov = "fov", features = feature_col, size = 0.5) +
-  ggtitle("Genes per cell")
+    ggtitle("Genes per cell")
 save_plot(p_spatial_qc, "02_spatial_qc.png", output_dir = args$output, width = 14, height = 7)
 
 if (length(molecule_genes) > 0) {

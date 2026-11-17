@@ -413,8 +413,8 @@ if (args$mode == "all_markers") {
   }
 
   de_results$comparison <- sprintf("%s_vs_%s",
-                                    args$condition_1,
-                                    ifelse(is.null(args$condition_2), "other", args$condition_2))
+                                   args$condition_1,
+                                   ifelse(is.null(args$condition_2), "other", args$condition_2))
 
 } else if (args$mode == "custom") {
   # Custom comparison using cells.1 and cells.2 (advanced)
@@ -585,14 +585,14 @@ if (nrow(sig_results) > 0) {
   # Check for UMAP
   if ("umap" %in% Reductions(seurat_obj)) {
     p_features <- FeaturePlot(seurat_obj, features = top_features,
-                               ncol = 3, reduction = "umap")
+                              ncol = 3, reduction = "umap")
     save_plot(p_features, "feature_plots_top_markers.png", output_dir = args$output,
-              width = 12, height = ceiling(length(top_features)/3) * 4)
+              width = 12, height = ceiling(length(top_features) / 3) * 4)
   }
 
   # Violin plots
   p_violin <- VlnPlot(seurat_obj, features = head(top_features, 6),
-                       pt.size = 0, ncol = 3)
+                      pt.size = 0, ncol = 3)
   save_plot(p_violin, "violin_plots_top_markers.png", output_dir = args$output,
             width = 12, height = 8)
 }
@@ -606,7 +606,7 @@ if (!is.null(args$features_plot)) {
     p_custom <- FeaturePlot(seurat_obj, features = features, ncol = 3)
     save_plot(p_custom, "feature_plots_custom.png", output_dir = args$output,
               width = 4 * min(length(features), 3),
-              height = 4 * ceiling(length(features)/3))
+              height = 4 * ceiling(length(features) / 3))
   }
 }
 

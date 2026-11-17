@@ -190,13 +190,16 @@ log_message(sprintf("Loaded %d cells, %d features",
 if (args$group_by %in% colnames(seurat_obj@meta.data)) {
   Idents(seurat_obj) <- args$group_by
 } else {
-  log_message(sprintf("WARNING: group_by column '%s' not found in metadata. Using default identities.", args$group_by), log_env)
-  log_message(sprintf("  Available columns: %s", paste(head(colnames(seurat_obj@meta.data), 10), collapse = ", ")), log_env)
+  log_message(sprintf("WARNING: group_by column '%s' not found in metadata. Using default identities.",
+                      args$group_by), log_env)
+  log_message(sprintf("  Available columns: %s",
+                      paste(head(colnames(seurat_obj@meta.data), 10), collapse = ", ")), log_env)
 }
 
 # Validate split_by column if specified
 if (!is.null(args$split_by) && !args$split_by %in% colnames(seurat_obj@meta.data)) {
-  log_message(sprintf("WARNING: split_by column '%s' not found in metadata. Split plots will be skipped.", args$split_by), log_env)
+  log_message(sprintf("WARNING: split_by column '%s' not found in metadata. Split plots will be skipped.",
+                      args$split_by), log_env)
   args$split_by <- NULL
 }
 
@@ -291,7 +294,7 @@ save_figure <- function(plot, name, w = args$width, h = args$height) {
   filepath <- file.path(args$output, filename)
   ggsave(filepath, plot, width = w, height = h, dpi = args$dpi)
   log_message(sprintf("  Saved: %s", filename), log_env)
-  return(filepath)
+  filepath
 }
 
 # -----------------------------------------------------------------------------
@@ -320,7 +323,7 @@ if (args$dim_plots) {
                        pt.size = args$pt_size,
                        ncol = min(n_splits, 4))
     save_figure(p_split, sprintf("02_dimplot_split_%s", args$split_by),
-                w = min(n_splits, 4) * 5, h = 5 * ceiling(n_splits/4))
+                w = min(n_splits, 4) * 5, h = 5 * ceiling(n_splits / 4))
   }
 
   # Additional reductions if available
@@ -358,7 +361,7 @@ if (args$feature_plots && length(features_to_plot) > 0) {
                           ncol = args$ncol)
 
     save_figure(p_feat, sprintf("03_featureplot_batch%d", i),
-                w = args$ncol * 4, h = ceiling(length(batch_features)/args$ncol) * 4)
+                w = args$ncol * 4, h = ceiling(length(batch_features) / args$ncol) * 4)
   }
 
   # Feature plot with split
@@ -366,10 +369,10 @@ if (args$feature_plots && length(features_to_plot) > 0) {
     top_features <- head(features_to_plot, 4)
 
     p_feat_split <- FeaturePlot(seurat_obj,
-                                 features = top_features,
-                                 split.by = args$split_by,
-                                 reduction = args$reduction,
-                                 pt.size = args$pt_size * 0.5)
+                                features = top_features,
+                                split.by = args$split_by,
+                                reduction = args$reduction,
+                                pt.size = args$pt_size * 0.5)
     n_splits <- length(unique(seurat_obj@meta.data[[args$split_by]]))
     save_figure(p_feat_split, "03_featureplot_split",
                 w = n_splits * 4, h = length(top_features) * 3)
@@ -393,14 +396,14 @@ if (args$violin_plots && length(features_to_plot) > 0) {
     batch_features <- features_to_plot[start_idx:end_idx]
 
     p_vln <- VlnPlot(seurat_obj,
-                      features = batch_features,
-                      group.by = args$group_by,
-                      pt.size = 0,
-                      ncol = min(length(batch_features), 3))
+                     features = batch_features,
+                     group.by = args$group_by,
+                     pt.size = 0,
+                     ncol = min(length(batch_features), 3))
 
     save_figure(p_vln, sprintf("04_violinplot_batch%d", i),
                 w = min(length(batch_features), 3) * 4,
-                h = ceiling(length(batch_features)/3) * 4)
+                h = ceiling(length(batch_features) / 3) * 4)
   }
 
   # Split violin
@@ -408,13 +411,13 @@ if (args$violin_plots && length(features_to_plot) > 0) {
     top_features <- head(features_to_plot, 4)
 
     p_vln_split <- VlnPlot(seurat_obj,
-                            features = top_features,
-                            group.by = args$group_by,
-                            split.by = args$split_by,
-                            pt.size = 0,
-                            ncol = 2)
+                           features = top_features,
+                           group.by = args$group_by,
+                           split.by = args$split_by,
+                           pt.size = 0,
+                           ncol = 2)
     save_figure(p_vln_split, "04_violinplot_split",
-                w = 10, h = ceiling(length(top_features)/2) * 4)
+                w = 10, h = ceiling(length(top_features) / 2) * 4)
   }
 }
 
@@ -461,9 +464,9 @@ if (args$heatmap && length(features_to_plot) > 0) {
   heatmap_features <- head(features_to_plot, 50)
 
   p_heat <- DoHeatmap(scale_for_heatmap(seurat_obj, heatmap_features),
-                       features = heatmap_features,
-                       group.by = args$group_by,
-                       size = 3) +
+                      features = heatmap_features,
+                      group.by = args$group_by,
+                      size = 3) +
     theme(text = element_text(size = 8))
 
   save_figure(p_heat, "06_heatmap",
@@ -483,9 +486,9 @@ if (args$heatmap && length(features_to_plot) > 0) {
 
       if (length(top_by_cluster) > 0) {
         p_heat_markers <- DoHeatmap(scale_for_heatmap(seurat_obj, top_by_cluster),
-                                     features = top_by_cluster,
-                                     group.by = args$group_by,
-                                     size = 3) +
+                                    features = top_by_cluster,
+                                    group.by = args$group_by,
+                                    size = 3) +
           theme(text = element_text(size = 7))
         save_figure(p_heat_markers, "06_heatmap_markers",
                     w = 14, h = max(10, length(top_by_cluster) * 0.15))
@@ -504,12 +507,12 @@ if (args$ridge_plots && length(features_to_plot) > 0) {
   ridge_features <- head(features_to_plot, 6)
 
   p_ridge <- RidgePlot(seurat_obj,
-                        features = ridge_features,
-                        group.by = args$group_by,
-                        ncol = 2)
+                       features = ridge_features,
+                       group.by = args$group_by,
+                       ncol = 2)
 
   save_figure(p_ridge, "07_ridgeplot",
-              w = 10, h = ceiling(length(ridge_features)/2) * 4)
+              w = 10, h = ceiling(length(ridge_features) / 2) * 4)
 }
 
 # -----------------------------------------------------------------------------
@@ -524,19 +527,19 @@ if (args$scatter_plots && length(features_to_plot) >= 2) {
   scatter_plots <- list()
 
   for (i in seq_len(n_pairs)) {
-    f1 <- features_to_plot[2*i - 1]
-    f2 <- features_to_plot[2*i]
+    f1 <- features_to_plot[2 * i - 1]
+    f2 <- features_to_plot[2 * i]
 
     scatter_plots[[i]] <- FeatureScatter(seurat_obj,
-                                          feature1 = f1,
-                                          feature2 = f2,
-                                          group.by = args$group_by)
+                                         feature1 = f1,
+                                         feature2 = f2,
+                                         group.by = args$group_by)
   }
 
   if (length(scatter_plots) > 0) {
     p_scatter <- wrap_plots(scatter_plots, ncol = 2)
     save_figure(p_scatter, "08_feature_scatter",
-                w = 10, h = ceiling(length(scatter_plots)/2) * 4)
+                w = 10, h = ceiling(length(scatter_plots) / 2) * 4)
   }
 }
 
@@ -552,19 +555,19 @@ qc_features <- qc_features[qc_features %in% colnames(seurat_obj@meta.data)]
 
 if (length(qc_features) > 0) {
   p_qc_vln <- VlnPlot(seurat_obj,
-                       features = qc_features,
-                       group.by = args$group_by,
-                       pt.size = 0,
-                       ncol = length(qc_features))
+                      features = qc_features,
+                      group.by = args$group_by,
+                      pt.size = 0,
+                      ncol = length(qc_features))
   save_figure(p_qc_vln, "09_qc_violin", w = length(qc_features) * 3, h = 5)
 
   p_qc_feat <- FeaturePlot(seurat_obj,
-                            features = qc_features,
-                            reduction = args$reduction,
-                            pt.size = args$pt_size * 0.5,
-                            ncol = 2)
+                           features = qc_features,
+                           reduction = args$reduction,
+                           pt.size = args$pt_size * 0.5,
+                           ncol = 2)
   save_figure(p_qc_feat, "09_qc_featureplot",
-              w = 8, h = ceiling(length(qc_features)/2) * 4)
+              w = 8, h = ceiling(length(qc_features) / 2) * 4)
 }
 
 # -----------------------------------------------------------------------------

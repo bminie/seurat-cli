@@ -118,7 +118,7 @@ get_script_dir <- function() {
     }
   }
   # Fallback to current directory
-  return(".")
+  "."
 }
 
 script_dir <- get_script_dir()
@@ -247,13 +247,13 @@ for (i in seq_along(tests)) {
       } else {
         cat("\n✗ FAILED - Missing output files\n\n")
         results[[test$name]] <- list(status = "FAILED", duration = test_duration,
-                                      reason = "Missing output files")
+                                     reason = "Missing output files")
       }
     }
   } else {
     cat("\n✗ FAILED - Exit code:", exit_code, "\n\n")
     results[[test$name]] <- list(status = "FAILED", duration = test_duration,
-                                  reason = paste("Exit code:", exit_code))
+                                 reason = paste("Exit code:", exit_code))
   }
 }
 
