@@ -7,15 +7,21 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# The jobs only read the repository
+permissions:
+  contents: read
+
 jobs:
   lint:
     name: Nextflow Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Setup Nextflow
-        uses: nf-core/setup-nextflow@v2
+        uses: nf-core/setup-nextflow@c66f1bfa2dc817ae23f4b34eaa26fa5f1453ca71 # v3.1.0
 
       - name: Check Nextflow version
         run: nextflow -version
@@ -40,10 +46,12 @@ jobs:
     name: Config Validation
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Setup Nextflow
-        uses: nf-core/setup-nextflow@v2
+        uses: nf-core/setup-nextflow@c66f1bfa2dc817ae23f4b34eaa26fa5f1453ca71 # v3.1.0
 
       - name: Validate config syntax
         run: |

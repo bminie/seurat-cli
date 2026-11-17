@@ -10,6 +10,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# The jobs only read the repository
+permissions:
+  contents: read
+
 jobs:
   demo-tests:
     name: Demo tests (scripts 01-08)
@@ -21,10 +25,12 @@ jobs:
         shell: bash -el {0}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up R environment (environment-r.yml)
-        uses: mamba-org/setup-micromamba@v2
+        uses: mamba-org/setup-micromamba@f457c30a868e4760d3a6fcea5f25dc655b8edf39 # v3.2.1
         with:
           environment-file: environment-r.yml
           cache-environment: true
@@ -45,7 +51,7 @@ jobs:
 
       - name: Upload test logs and tables on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: demo-test-output
           path: |
